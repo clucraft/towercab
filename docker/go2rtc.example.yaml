@@ -1,0 +1,27 @@
+# go2rtc configuration for TowerCab's `cameras` compose profile.
+#
+#   mkdir go2rtc
+#   cp docker/go2rtc.example.yaml go2rtc/go2rtc.yaml
+#   docker compose --profile cameras up -d
+#
+# go2rtc turns an RTSP camera (or anything else it can read) into something a browser can play.
+# TowerCab reaches it inside the compose network and passes on exactly one thing to viewers: the
+# stream of a camera that is listed in TowerCab's own config. go2rtc's API is not published.
+# Full reference: https://github.com/AlexxIT/go2rtc
+
+streams:
+  # name: source
+  # The name is what goes into the TowerCab camera entry:
+  #   - { id: ramp, airport: KLAF, name: Ramp, kind: webrtc, source: ramp }
+  #
+  # ramp: rtsp://user:password@192.168.1.50:554/stream1
+
+api:
+  listen: ":1984" # reached by TowerCab at http://go2rtc:1984; this port is not published to the host
+
+webrtc:
+  listen: ":8555" # published by the compose file (TCP and UDP)
+  # In a container go2rtc cannot tell which address browsers reach it at, so say it here: this host's
+  # address on your network, and the port published above. Without it video still plays, carried over
+  # TowerCab's own connection, which costs a little latency.
+  # candidates: [ 192.168.1.55:8555 ]

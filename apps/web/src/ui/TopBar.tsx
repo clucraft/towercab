@@ -12,11 +12,15 @@ interface Props {
   hasSelection: boolean;
   trails: boolean;
   panelOpen: boolean;
+  /** How many cameras this airport has. */
+  cameras: number;
+  camerasOpen: boolean;
   onAirport(icao: string): void;
   onMode(mode: SceneMode): void;
   onView(id: string): void;
   onTrails(enabled: boolean): void;
   onPanel(): void;
+  onCameras(): void;
 }
 
 /** Airport switcher, base map switch and view presets. */
@@ -117,6 +121,22 @@ export function TopBar(props: Props) {
           </label>
         )}
       </nav>
+
+      <button
+        type="button"
+        className={props.camerasOpen ? 'on' : ''}
+        aria-pressed={props.camerasOpen}
+        disabled={props.cameras === 0}
+        title={
+          props.cameras === 0
+            ? `No cameras are set up for ${props.icao}`
+            : `Live cameras at ${props.icao} (C)`
+        }
+        onClick={props.onCameras}
+        data-testid="cameras-toggle"
+      >
+        Cameras{props.cameras > 0 ? ` ${props.cameras}` : ''}
+      </button>
 
       <span className="spacer" />
 

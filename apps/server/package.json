@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@fastify/static": "10.1.12",
+    "better-sqlite3": "12.11.1",
     "egm96-universal": "1.1.1",
     "fastify": "5.12.8",
     "pino": "10.4.0",
@@ -22,6 +23,7 @@
   },
   "devDependencies": {
     "@towercab/shared": "workspace:*",
+    "@types/better-sqlite3": "9.6.0",
     "@types/ws": "8.18.2",
     "pino-pretty": "13.2.0",
     "tsup": "9.0.0"

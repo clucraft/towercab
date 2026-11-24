@@ -928,3 +928,612 @@ dl.facts dd {
     scrollbar-width: none;
   }
 }
+
+/* ---- cameras ---- */
+
+.segmented.small button,
+.camera-bar button,
+.camera-bar select,
+.camera-tile header button {
+  height: 1.6rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.camera-bar > button,
+.camera-bar select,
+.camera-tile header button {
+  border-radius: 6px;
+}
+
+.camera-bar button.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.camera-bar button.icon {
+  width: 1.6rem;
+  padding: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.camera-bar :focus-visible,
+.camera-tile :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.camera-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.4rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.camera-bar .spacer {
+  flex: 1;
+}
+
+.camera-bar select {
+  max-width: 11rem;
+}
+
+.camera-name {
+  overflow: hidden;
+  padding: 0 0.2rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.camera-opacity {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.camera-opacity input {
+  width: 6rem;
+  accent-color: var(--accent);
+}
+
+.camera-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: #000;
+}
+
+/* Whatever plays, it is fitted whole into its box. */
+.camera-media,
+.camera-media.youtube iframe,
+.camera-media.go2rtc video-stream,
+.camera-media.go2rtc video {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  object-fit: contain;
+}
+
+img.camera-media {
+  margin: auto;
+}
+
+.camera-media-link {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.camera-message {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.6rem;
+  padding: 1rem;
+  background: rgba(7, 10, 14, 0.92);
+  text-align: center;
+}
+
+.camera-message p {
+  max-width: 26rem;
+  margin: 0;
+}
+
+.camera-message .button,
+.camera-hint {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.camera-hint {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.camera-stale {
+  position: absolute;
+  top: 0.4rem;
+  left: 0.4rem;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--warn);
+  border-radius: 4px;
+  background: rgba(24, 20, 8, 0.92);
+  color: var(--warn);
+  font-size: 0.8rem;
+}
+
+.camera-credit {
+  overflow: hidden;
+  padding: 0.15rem 0.5rem;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.camera-credit a {
+  color: var(--muted);
+}
+
+/* A window over the 3D view. The corner resizes it; the bar moves it. */
+.camera-pip {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  min-width: 320px;
+  min-height: 240px;
+  max-width: calc(100% - 8px);
+  max-height: calc(100% - 8px);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  resize: both;
+}
+
+.camera-grip {
+  padding: 0 0.15rem;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.camera-pip .camera-bar {
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+}
+
+/* The 3D view on the left, the camera on the right. */
+.stage.split .scene {
+  right: 50%;
+  width: 50%;
+}
+
+.camera-split {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+}
+
+/* Every camera at once, in place of the 3D view. */
+.camera-grid-view {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.camera-grid {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  grid-auto-rows: minmax(14rem, 1fr);
+  gap: 0.5rem;
+  min-height: 0;
+  padding: 0.5rem;
+  overflow-y: auto;
+}
+
+.camera-tile {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.camera-tile header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+}
+
+/* The camera picture between the 3D view and its labels, so the labels are drawn over the picture. */
+.camera-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: transparent;
+  pointer-events: none;
+}
+
+.scene .label-overlay {
+  z-index: 2;
+}
+
+/* Imagery credits stay readable whatever is drawn over the scene. */
+.scene .cesium-viewer-bottom {
+  z-index: 3;
+}
+
+.camera-overlay-bar {
+  position: absolute;
+  top: 0.6rem;
+  left: 50%;
+  z-index: 4;
+  width: min(40rem, calc(100% - 1.2rem));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  transform: translateX(-50%);
+}
+
+.camera-overlay-bar .camera-bar {
+  border-bottom: 0;
+}
+
+@media (max-width: 900px), (max-height: 520px) {
+  .camera-pip {
+    min-width: 240px;
+    min-height: 200px;
+  }
+
+  /* Side by side needs width; in a narrow window the camera goes below instead. */
+  @media (max-aspect-ratio: 1 / 1) {
+    .stage.split .scene {
+      right: 0;
+      bottom: 50%;
+      width: 100%;
+      height: 50%;
+    }
+
+    .camera-split {
+      top: 50%;
+      left: 0;
+      border-top: 1px solid var(--line);
+      border-left: 0;
+    }
+  }
+}
+
+/* ---- admin page ---- */
+
+.admin {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.admin-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.admin-bar .brand {
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+}
+
+.admin-bar .spacer {
+  flex: 1;
+}
+
+.admin button,
+.admin select,
+.admin-signin button,
+.admin-signin input,
+.admin-name {
+  height: 1.9rem;
+  padding: 0 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+}
+
+.admin button,
+.admin select,
+.admin-signin button {
+  cursor: pointer;
+}
+
+.admin button:disabled,
+.admin-signin button:disabled {
+  color: #4b5a6b;
+  cursor: not-allowed;
+}
+
+.admin button.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.admin :focus-visible,
+.admin-signin :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.admin-signin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: center;
+  gap: 0.6rem;
+  margin: 1rem 0;
+}
+
+.admin-signin label {
+  display: grid;
+  gap: 0.25rem;
+  text-align: left;
+}
+
+.admin-signin input {
+  width: 18rem;
+  max-width: 80vw;
+}
+
+.admin-error {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--bad);
+  background: rgba(60, 16, 16, 0.6);
+}
+
+.admin-columns {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(20rem, 30rem) minmax(0, 1fr);
+  min-height: 0;
+}
+
+.admin-list {
+  min-height: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--line);
+}
+
+.admin-section {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-section h2,
+.admin-section summary,
+.pose-form h2 {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-section summary {
+  cursor: pointer;
+}
+
+.admin-section p {
+  margin: 0 0 0.5rem;
+}
+
+.admin-section .count {
+  margin-left: 0.3rem;
+  color: var(--text);
+  font-weight: 400;
+}
+
+.admin .small {
+  font-size: 0.82rem;
+}
+
+.admin-outcomes {
+  margin: 0.6rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-outcomes .bad {
+  color: var(--bad);
+}
+
+.admin-card {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.admin-card.editing {
+  border-color: var(--warn);
+}
+
+.admin-thumb {
+  flex: none;
+  width: 7.5rem;
+}
+
+.admin-thumb img {
+  display: block;
+  width: 100%;
+  border-radius: 4px;
+}
+
+.admin-card-body {
+  display: grid;
+  flex: 1;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.admin-card-body p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-name {
+  width: 100%;
+}
+
+.admin-description {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.admin-actions button {
+  height: 1.7rem;
+  padding: 0 0.55rem;
+  font-size: 0.85rem;
+}
+
+.admin-actions a {
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+
+.admin-editor {
+  position: relative;
+  min-height: 0;
+}
+
+.pose-editor,
+.pose-scene {
+  position: absolute;
+  inset: 0;
+}
+
+.pose-scene .cesium-viewer,
+.pose-scene .cesium-widget,
+.pose-scene .cesium-widget canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.pose-scene .cesium-viewer-bottom {
+  left: 0.5rem;
+  bottom: 0.35rem;
+}
+
+.pose-form {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  display: grid;
+  gap: 0.45rem;
+  width: min(21rem, calc(100% - 1.2rem));
+  max-height: calc(100% - 1.2rem);
+  overflow-y: auto;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(18, 25, 34, 0.94);
+}
+
+.pose-form p,
+.pose-form h2 {
+  margin: 0;
+}
+
+.pose-field {
+  display: grid;
+  grid-template-columns: 8.5rem 1fr 3.5rem;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+}
+
+.pose-field input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.pose-field output {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+@media (max-width: 900px) {
+  .admin-columns {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .admin-list {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+}

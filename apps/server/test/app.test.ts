@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AirportDetail, ClientConfig, ServerMessage } from '@towercab/shared';
+import type { AirportDetail, CamerasResponse, ClientConfig, ServerMessage } from '@towercab/shared';
 import { ServerMessageSchema } from '@towercab/shared';
 import type { FastifyInstance } from 'fastify';
 import pino from 'pino';
@@ -222,9 +222,10 @@ describe('server', () => {
 
     it('lists only enabled cameras for the airport', async () => {
       await start();
-      const cams = (await app.inject({ method: 'GET', url: '/api/cameras/KLAF' })).json() as { id: string }[];
-      expect(cams.map((c) => c.id)).toEqual(['ramp']);
-      expect((await app.inject({ method: 'GET', url: '/api/cameras/KIND' })).json()).toEqual([]);
+      const klaf = (await app.inject({ method: 'GET', url: '/api/cameras/KLAF' })).json() as CamerasResponse;
+      expect(klaf.cameras.map((c) => c.id)).toEqual(['ramp']);
+      const kind = (await app.inject({ method: 'GET', url: '/api/cameras/KIND' })).json() as CamerasResponse;
+      expect(kind).toEqual({ cameras: [], go2rtc: false });
     });
 
     it('serves the cached METAR', async () => {

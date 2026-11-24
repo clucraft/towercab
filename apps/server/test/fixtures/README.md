@@ -14,3 +14,7 @@ what the services actually send. Do not hand-edit them; re-capture instead.
 | `ourairports-airports.csv`, `ourairports-runways.csv` | <https://davidmegginson.github.io/ourairports-data/>, header plus the rows for KLAF, KIND, KORD and one heliport | OurAirports, public domain |
 | `overpass-klaf.json` | Overpass API query for the KLAF aerodrome (see `src/reference/overpass.ts`) | © OpenStreetMap contributors, ODbL 1.0 |
 | `planespotters-a0d5d6.json` | `https://api.planespotters.net/pub/photos/hex/a0d5d6` | planespotters.net; photo © the named photographer |
+| `youtube-error-no-key.json`, `youtube-error-invalid-key.json` | `https://www.googleapis.com/youtube/v3/search` without a key (HTTP 403), and with a made-up key in the `X-Goog-Api-Key` header (HTTP 400) | Google |
+| `windy-error-no-key.json`, `windy-error-invalid-key.json` | `https://api.windy.com/webcams/api/v3/webcams?nearby=…` without the `x-windy-api-key` header (HTTP 403), and with a made-up key (HTTP 401) | Windy |
+
+`documented/` holds two fixtures that are *not* captures; see the README there.

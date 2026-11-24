@@ -1,20 +1,25 @@
 import 'cesium/Build/Cesium/Widgets/widgets.css';
-import type { Aircraft, AirportDetail, ClientConfig } from '@towercab/shared';
+import type { Aircraft, AirportDetail, CameraPose, ClientConfig, PublicCamera } from '@towercab/shared';
 import {
   BoundingSphere,
-  type Cartesian2,
+  Cartesian2,
   Cartesian3,
   Cartographic,
   type Cesium3DTileset,
   Math as CesiumMath,
   Color,
+  CustomDataSource,
   createGooglePhotorealistic3DTileset,
   createWorldTerrainAsync,
   DirectionalLight,
   EllipsoidTerrainProvider,
   HeadingPitchRange,
   Ion,
+  JulianDate,
+  LabelStyle,
   Matrix4,
+  PerspectiveFrustum,
+  SceneTransforms,
   ScreenSpaceEventHandler,
   ScreenSpaceEventType,
   sampleTerrainMostDetailed,
@@ -24,6 +29,8 @@ import {
 } from 'cesium';
 import type { LiveStore } from '../live/store';
 import { type AircraftLayer, type DrawnAircraft, EntityAircraftLayer } from './aircraftLayer';
+import { CameraConeLayer } from './cameraCones';
+import { angleDiffDeg, bearingDeg, DEFAULT_ASPECT, sceneFovRad } from './cameraPose';
 import { FlatGround, type GroundSampler, ProbedGround, SampledGround } from './ground';
 import { LabelOverlay } from './labelOverlay';
 import { LayoutLayer } from './layoutLayer';
@@ -40,6 +47,8 @@ export interface SceneCallbacks {
   onView?(viewId: string): void;
   /** A short message for the user, such as the reason for falling back to Schematic. */
   onNotice?(text: string): void;
+  /** A camera's view cone was clicked. */
+  onCameraPick?(id: string): void;
 }
 
 export interface SceneOptions {
@@ -76,6 +85,25 @@ const TRAIL_UPDATE_MS = 200;
  */
 const SURFACE_SANITY_M = 120;
 const FLY_SECONDS = 1.2;
+/** How often view cones are rebuilt while a camera's ground height is still being looked up. */
+const CONE_RETRY_MS = 1500;
+/** Distance from a camera at which its pose handles are drawn in the pose editor, metres. */
+const HANDLE_RANGE_M = 260;
+
+/** What the 3D view is doing when it looks through a camera. */
+interface Matched {
+  id: string;
+  /** Drawn over the camera's picture: the view is locked and sized to the picture. */
+  overlay: boolean;
+  /** Shape of the camera's picture, when known. */
+  aspect: number | null;
+}
+
+/** A pose being edited in the admin page. */
+export interface PoseEdit {
+  pose: CameraPose;
+  onChange(pose: CameraPose): void;
+}
 
 /**
  * Cesium fetches the Google tileset through one shared resource and refuses a second request while the
@@ -95,6 +123,8 @@ export class SceneController {
   private readonly trails: TrailLayer;
   private readonly labels: LabelOverlay;
   private readonly layout: LayoutLayer;
+  private readonly cones: CameraConeLayer;
+  private readonly handles = new CustomDataSource('pose-handles');
   private readonly input: ScreenSpaceEventHandler;
   private readonly callbacks: SceneCallbacks;
   private readonly unlisten: () => void;
@@ -122,6 +152,12 @@ export class SceneController {
   private tilesWaitMs: number | null = null;
   private destroyed = false;
   private modeToken = 0;
+  private cameras: PublicCamera[] = [];
+  private matched: Matched | null = null;
+  private defaultFov = CesiumMath.toRadians(60);
+  private lastConeCheckAt = 0;
+  private poseEdit: PoseEdit | null = null;
+  private dragging: 'aim' | 'fov' | null = null;
 
   private constructor(private readonly options: SceneOptions) {
     const { container, airport, config } = options;
@@ -173,13 +209,30 @@ export class SceneController {
     this.layer = new EntityAircraftLayer(this.viewer);
     this.trails = new TrailLayer(scene);
     this.labels = new LabelOverlay(scene, container);
+    this.cones = new CameraConeLayer(
+      this.viewer,
+      (lon, lat) => this.ground.heightAt(lon, lat),
+      () => this.fieldSceneHeight(),
+    );
+    void this.viewer.dataSources.add(this.handles);
+    const frustum = this.viewer.camera.frustum;
+    if (frustum instanceof PerspectiveFrustum && frustum.fov) this.defaultFov = frustum.fov;
 
     this.input = new ScreenSpaceEventHandler(scene.canvas);
     this.input.setInputAction(
       (event: { position: Cartesian2 }) => this.onClick(event.position),
       ScreenSpaceEventType.LEFT_CLICK,
     );
+    this.input.setInputAction(
+      (event: { position: Cartesian2 }) => this.onPointerDown(event.position),
+      ScreenSpaceEventType.LEFT_DOWN,
+    );
+    this.input.setInputAction(() => this.onPointerUp(), ScreenSpaceEventType.LEFT_UP);
     this.input.setInputAction((event: { endPosition: Cartesian2 }) => {
+      if (this.dragging) {
+        this.onHandleDrag(event.endPosition);
+        return;
+      }
       const hex = this.labels.hitTest(event.endPosition.x, event.endPosition.y);
       this.labels.setHover(hex);
       scene.canvas.style.cursor = hex ? 'pointer' : '';
@@ -213,6 +266,7 @@ export class SceneController {
 
     this.resizeObserver = new ResizeObserver(() => {
       this.viewer.resize();
+      this.applyFov();
       scene.requestRender();
     });
     this.resizeObserver.observe(container);
@@ -275,10 +329,13 @@ export class SceneController {
     scene.backgroundColor = Color.fromCssColorString(SCHEMATIC.sky);
 
     this.applyGround();
+    this.cones.rebuild();
     // Flat Schematic measures heights from the field; the others from the ellipsoid. Move the camera by the
     // difference so the view does not jump when switching.
     const shift = previousOffset - this.heightOffset;
     if (shift !== 0 && !flags.silent) this.shiftCamera(shift);
+    // A view through a camera is placed by that camera's pose, whatever the base map.
+    if (this.matched) this.placeAtCamera(this.matched.id, false);
     scene.requestRender();
     this.callbacks.onMode?.(mode);
   }
@@ -296,6 +353,7 @@ export class SceneController {
         this.callbacks.onNotice?.('Select an aircraft to follow.');
         return;
       }
+      this.clearMatch();
       this.followHex = hex;
       this.followStarted = false;
       this.currentView = 'follow';
@@ -308,6 +366,7 @@ export class SceneController {
     }
 
     this.followHex = null;
+    this.clearMatch();
     camera.cancelFlight();
     camera.lookAtTransform(Matrix4.IDENTITY);
     const groundHeight = this.fieldSceneHeight();
@@ -382,6 +441,217 @@ export class SceneController {
     this.viewer.scene.requestRender();
   }
 
+  // ---- cameras -------------------------------------------------------------------------------------
+
+  /** The airport's cameras. Those with a pose are drawn as view cones. */
+  setCameras(cameras: readonly PublicCamera[]): void {
+    this.cameras = [...cameras];
+    this.cones.set(this.cameras.flatMap((c) => (c.pose ? [{ id: c.id, name: c.name, pose: c.pose }] : [])));
+    if (this.matched && !this.cameras.some((c) => c.id === this.matched?.id && c.pose)) this.endMatch();
+  }
+
+  /** Marks the camera whose picture is on show. */
+  setActiveCamera(id: string | null): void {
+    this.cones.setActive(id);
+  }
+
+  setConesVisible(visible: boolean): void {
+    this.cones.show = visible;
+    this.viewer.scene.requestRender();
+  }
+
+  /** The camera the 3D view is looking through, if any. */
+  get matchedCamera(): string | null {
+    return this.matched?.id ?? null;
+  }
+
+  /**
+   * Puts the 3D camera where a real camera is, pointing the same way with the same field of view. With
+   * `overlay` the view is locked there and sized to the camera's picture (`aspect`), so that the scene
+   * and its labels line up with the picture drawn over it. False when the camera has no pose.
+   */
+  matchCamera(
+    id: string,
+    options: { overlay?: boolean; aspect?: number | null; animate?: boolean } = {},
+  ): boolean {
+    const camera = this.cameras.find((c) => c.id === id);
+    if (!camera?.pose || this.destroyed) return false;
+    this.followHex = null;
+    this.matched = { id, overlay: options.overlay ?? false, aspect: options.aspect ?? null };
+    this.placeAtCamera(id, !this.matched.overlay && options.animate !== false);
+    this.cones.setHidden(id);
+    this.viewer.scene.screenSpaceCameraController.enableInputs = !this.matched.overlay;
+    this.currentView = `cam:${id}`;
+    this.callbacks.onView?.(this.currentView);
+    return true;
+  }
+
+  /** Gives the 3D camera back: its usual field of view, and the mouse. */
+  endMatch(): void {
+    if (!this.matched) return;
+    this.clearMatch();
+    if (this.currentView.startsWith('cam:')) {
+      this.currentView = 'free';
+      this.callbacks.onView?.('free');
+    }
+  }
+
+  private clearMatch(): void {
+    if (!this.matched) return;
+    this.matched = null;
+    this.applyFov();
+    this.cones.setHidden(null);
+    this.viewer.scene.screenSpaceCameraController.enableInputs = true;
+    this.viewer.scene.requestRender();
+  }
+
+  private placeAtCamera(id: string, animate: boolean): void {
+    const pose = this.cameras.find((c) => c.id === id)?.pose;
+    if (!pose) return;
+    const camera = this.viewer.camera;
+    camera.cancelFlight();
+    camera.lookAtTransform(Matrix4.IDENTITY);
+    this.applyFov();
+    const view = {
+      destination: this.cones.lensPosition(pose).position,
+      orientation: {
+        heading: CesiumMath.toRadians(pose.headingDeg),
+        pitch: CesiumMath.toRadians(pose.pitchDeg),
+        roll: 0,
+      },
+    };
+    if (animate) camera.flyTo({ ...view, duration: FLY_SECONDS });
+    else camera.setView(view);
+    this.viewer.scene.requestRender();
+  }
+
+  /** The field of view for what the 3D camera is doing now: its own, or the matched camera's. */
+  private applyFov(): void {
+    const frustum = this.viewer.camera.frustum;
+    if (!(frustum instanceof PerspectiveFrustum)) return;
+    const pose = this.matched ? this.cameras.find((c) => c.id === this.matched?.id)?.pose : undefined;
+    if (!this.matched || !pose) {
+      frustum.fov = this.defaultFov;
+      return;
+    }
+    const canvas = this.viewer.scene.canvas;
+    frustum.fov = sceneFovRad(
+      pose.hfovDeg,
+      canvas.clientWidth,
+      canvas.clientHeight,
+      this.matched.overlay ? (this.matched.aspect ?? DEFAULT_ASPECT) : null,
+    );
+  }
+
+  // ---- pose editor (admin page) ---------------------------------------------------------------------
+
+  /**
+   * Starts, updates or ends editing a camera pose in the scene. While editing, a click on the ground moves
+   * the camera there, and two handles can be dragged: one turns the camera, the other widens or narrows
+   * its field of view. Every change is reported; the caller passes the new pose back in.
+   */
+  editPose(edit: PoseEdit | null): void {
+    this.poseEdit = edit;
+    this.handles.entities.removeAll();
+    if (!edit) {
+      this.dragging = null;
+      this.viewer.scene.screenSpaceCameraController.enableInputs = true;
+      this.viewer.scene.requestRender();
+      return;
+    }
+    const { pose } = edit;
+    const at = (bearing: number) => destination(pose.lat, pose.lon, bearing, HANDLE_RANGE_M);
+    const handle = (id: string, bearing: number, colour: string, text: string) => {
+      const point = at(bearing);
+      const surface = this.ground.heightAt(point.lon, point.lat) ?? this.fieldSceneHeight();
+      this.handles.entities.add({
+        id: `handle:${id}`,
+        position: Cartesian3.fromDegrees(point.lon, point.lat, surface + 1),
+        point: {
+          pixelSize: 16,
+          color: Color.fromCssColorString(colour),
+          outlineColor: Color.BLACK,
+          outlineWidth: 2,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+        label: {
+          text,
+          font: '12px system-ui, sans-serif',
+          fillColor: Color.WHITE,
+          outlineColor: Color.BLACK,
+          outlineWidth: 3,
+          style: LabelStyle.FILL_AND_OUTLINE,
+          pixelOffset: new Cartesian2(0, -18),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      });
+    };
+    handle('aim', pose.headingDeg, '#fbbf24', 'direction');
+    handle('fov', pose.headingDeg - pose.hfovDeg / 2, '#3fd0ff', 'field of view');
+    this.viewer.scene.requestRender();
+  }
+
+  /** Where a camera's lens is on screen, in pixels from the scene's top left corner. For tests. */
+  cameraLensAt(id: string): { x: number; y: number } | null {
+    const pose = this.cameras.find((c) => c.id === id)?.pose;
+    if (!pose) return null;
+    const { position } = this.cones.lensPosition(pose);
+    const at = SceneTransforms.worldToWindowCoordinates(this.viewer.scene, position);
+    return at ? { x: at.x, y: at.y } : null;
+  }
+
+  /** Where a pose handle is on screen, in pixels from the scene's top left corner. For tests. */
+  poseHandleAt(which: 'aim' | 'fov'): { x: number; y: number } | null {
+    const position = this.handles.entities.getById(`handle:${which}`)?.position?.getValue(JulianDate.now());
+    const at = position ? SceneTransforms.worldToWindowCoordinates(this.viewer.scene, position) : undefined;
+    return at ? { x: at.x, y: at.y } : null;
+  }
+
+  private onPointerDown(position: Cartesian2): void {
+    if (!this.poseEdit) return;
+    const id = (this.viewer.scene.pick(position) as { id?: { id?: unknown } } | undefined)?.id?.id;
+    if (id !== 'handle:aim' && id !== 'handle:fov') return;
+    this.dragging = id === 'handle:aim' ? 'aim' : 'fov';
+    // The drag turns the camera pose, not the 3D view.
+    this.viewer.scene.screenSpaceCameraController.enableInputs = false;
+  }
+
+  private onPointerUp(): void {
+    if (!this.dragging) return;
+    this.dragging = null;
+    this.viewer.scene.screenSpaceCameraController.enableInputs = true;
+  }
+
+  private onHandleDrag(position: Cartesian2): void {
+    const edit = this.poseEdit;
+    const ground = this.groundAt(position);
+    if (!edit || !ground) return;
+    const { pose } = edit;
+    const bearing = bearingDeg(pose.lat, pose.lon, ground.lat, ground.lon);
+    if (this.dragging === 'aim') {
+      edit.onChange({ ...pose, headingDeg: Math.round(bearing * 10) / 10 });
+    } else {
+      // The handle marks one edge of the picture, so the field of view is twice its angle off the axis.
+      const half = Math.abs(angleDiffDeg(bearing, pose.headingDeg));
+      edit.onChange({ ...pose, hfovDeg: Math.round(Math.min(170, Math.max(5, half * 2))) });
+    }
+  }
+
+  /** The point on the ground under a screen position. */
+  private groundAt(position: Cartesian2): { lat: number; lon: number } | null {
+    const { scene, camera } = this.viewer;
+    let point: Cartesian3 | undefined;
+    if (this.currentMode === 'photoreal' && scene.pickPositionSupported) point = scene.pickPosition(position);
+    if (!point) {
+      const ray = camera.getPickRay(position);
+      point = ray ? scene.globe.pick(ray, scene) : undefined;
+    }
+    point ??= camera.pickEllipsoid(position);
+    if (!point) return null;
+    const where = Cartographic.fromCartesian(point);
+    return { lat: CesiumMath.toDegrees(where.latitude), lon: CesiumMath.toDegrees(where.longitude) };
+  }
+
   stats(): SceneStats {
     const frames = this.frameTimes;
     const average = frames.length ? frames.reduce((a, b) => a + b, 0) / frames.length : 0;
@@ -420,6 +690,7 @@ export class SceneController {
       () => this.labels.destroy(),
       () => this.trails.destroy(),
       () => this.layer.destroy(),
+      () => this.cones.destroy(),
       () => this.layout.destroy(),
       () => this.viewer.destroy(),
     ];
@@ -455,6 +726,12 @@ export class SceneController {
       this.lastTrailAt = now;
       this.trails.update(renderTime, this.layer);
     }
+    // A camera's ground height may still have been on its way when its cone was drawn.
+    if (this.cones.needsHeights && now - this.lastConeCheckAt >= CONE_RETRY_MS) {
+      this.lastConeCheckAt = now;
+      this.cones.rebuild();
+      if (this.matched?.overlay) this.placeAtCamera(this.matched.id, false);
+    }
     // With nothing moving there is nothing to redraw until the camera moves.
     this.viewer.scene.requestRenderMode = this.layer.count === 0;
     this.scriptThisFrame = performance.now() - now;
@@ -474,7 +751,26 @@ export class SceneController {
       return;
     }
     const picked = this.viewer.scene.pick(position);
-    this.select(this.layer.hexOfPicked(picked));
+    const hex = this.layer.hexOfPicked(picked);
+    const camera = hex ? null : this.cones.idOfPicked(picked);
+    if (this.poseEdit && !hex) {
+      // In the pose editor a click on the ground puts the camera there.
+      const ground = this.groundAt(position);
+      if (ground) {
+        const { pose } = this.poseEdit;
+        this.poseEdit.onChange({
+          ...pose,
+          lat: Math.round(ground.lat * 1e6) / 1e6,
+          lon: Math.round(ground.lon * 1e6) / 1e6,
+        });
+      }
+      return;
+    }
+    if (camera) {
+      this.callbacks.onCameraPick?.(camera);
+      return;
+    }
+    this.select(hex);
   }
 
   // ---- follow camera --------------------------------------------------------------------------------
@@ -651,6 +947,19 @@ export class SceneController {
     });
     if (orbiting) this.setView('orbit', { animate: false });
   }
+}
+
+/** The point a distance away from another along a compass bearing, for the short distances used here. */
+function destination(
+  lat: number,
+  lon: number,
+  bearingDegrees: number,
+  metres: number,
+): { lat: number; lon: number } {
+  const bearing = CesiumMath.toRadians(bearingDegrees);
+  const north = (metres * Math.cos(bearing)) / 111_320;
+  const east = (metres * Math.sin(bearing)) / (111_320 * Math.cos(CesiumMath.toRadians(lat)));
+  return { lat: lat + north, lon: lon + east };
 }
 
 function describe(err: unknown): string {

@@ -1,0 +1,78 @@
+{
+  "total": 4,
+  "webcams": [
+    {
+      "title": "Example Town: Airport Road",
+      "viewCount": 12345,
+      "webcamId": 1234567890,
+      "status": "active",
+      "lastUpdatedOn": "2026-11-24T20:00:00.000Z",
+      "images": {
+        "current": {
+          "icon": "https://images.example.test/1234567890/icon.jpg?token=first",
+          "thumbnail": "https://images.example.test/1234567890/thumbnail.jpg?token=first",
+          "preview": "https://images.example.test/1234567890/preview.jpg?token=first"
+        },
+        "sizes": {
+          "icon": { "width": 48, "height": 48 },
+          "thumbnail": { "width": 200, "height": 112 },
+          "preview": { "width": 400, "height": 224 }
+        },
+        "daylight": {
+          "icon": "https://images.example.test/1234567890/daylight/icon.jpg?token=first",
+          "thumbnail": "https://images.example.test/1234567890/daylight/thumbnail.jpg?token=first",
+          "preview": "https://images.example.test/1234567890/daylight/preview.jpg?token=first"
+        }
+      },
+      "location": {
+        "city": "Example Town",
+        "region": "Indiana",
+        "region_code": "US.IN",
+        "country": "United States",
+        "country_code": "US",
+        "continent": "North America",
+        "continent_code": "NA",
+        "latitude": 40.43,
+        "longitude": -86.91
+      },
+      "urls": {
+        "detail": "https://windy.example.test/webcams/1234567890",
+        "edit": "https://windy.example.test/webcams/edit/1234567890",
+        "provider": "https://provider.example.test/airport-road"
+      }
+    },
+    {
+      "title": "Example Town: River Bridge",
+      "viewCount": 77,
+      "webcamId": 1234567891,
+      "status": "inactive",
+      "lastUpdatedOn": "2025-01-01T00:00:00.000Z",
+      "images": { "current": { "icon": "", "thumbnail": "", "preview": "" } },
+      "location": { "city": "Example Town", "latitude": 40.42, "longitude": -86.9 },
+      "urls": { "detail": "https://windy.example.test/webcams/1234567891" }
+    },
+    {
+      "title": "No page to link to",
+      "viewCount": 5,
+      "webcamId": 1234567892,
+      "status": "active",
+      "lastUpdatedOn": "2026-11-24T20:00:00.000Z"
+    },
+    {
+      "title": "Example Town: Highway 52",
+      "viewCount": 900,
+      "webcamId": 1234567893,
+      "status": "active",
+      "lastUpdatedOn": "2026-11-24T20:01:00.000Z",
+      "images": {
+        "current": {
+          "icon": "https://images.example.test/1234567893/icon.jpg?token=first",
+          "thumbnail": "https://images.example.test/1234567893/thumbnail.jpg?token=first",
+          "preview": "https://images.example.test/1234567893/preview.jpg?token=first"
+        }
+      },
+      "location": { "city": "Example Town", "latitude": 40.5, "longitude": -86.9 },
+      "urls": { "detail": "https://windy.example.test/webcams/1234567893" }
+    }
+  ]
+}

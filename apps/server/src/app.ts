@@ -3,7 +3,9 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance, LogController } from 'fastify';
+import { registerAdminRoutes } from './routes/admin';
 import { registerApiRoutes } from './routes/api';
+import { registerCameraRoutes } from './routes/cameras';
 import type { Services } from './services';
 import { findUp } from './util/paths';
 
@@ -16,6 +18,9 @@ const NON_SPA_PREFIXES = [
   '/cesium/',
   '/models/',
   '/replays/',
+  '/proxy/',
+  '/go2rtc/',
+  '/admin/api/',
   '/assets/',
 ];
 
@@ -27,6 +32,9 @@ export async function buildApp(services: Services): Promise<FastifyInstance> {
     loggerInstance: logger,
     // The app sits behind a reverse proxy; trust X-Forwarded-* for protocol, host and client address.
     trustProxy: true,
+    // On shutdown, do not wait for open connections: someone watching a camera stream holds one open for
+    // as long as they watch, and `docker stop` should not have to wait for them.
+    forceCloseConnections: true,
     // One log line per request is noise next to static files and health checks; keep it for debugging only.
     logController: new LogController({ disableRequestLogging: !['debug', 'trace'].includes(env.logLevel) }),
   });
@@ -41,6 +49,8 @@ export async function buildApp(services: Services): Promise<FastifyInstance> {
   }));
 
   registerApiRoutes(app, services);
+  registerCameraRoutes(app, services);
+  registerAdminRoutes(app, services);
   services.hub.attach(app.server);
   app.addHook('onClose', async () => services.close());
 

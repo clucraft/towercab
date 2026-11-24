@@ -1,5 +1,6 @@
-import { AirportEntrySchema, CameraConfigSchema } from '@towercab/shared';
+import { AirportEntrySchema, CameraConfigSchema, parseYouTubeSource } from '@towercab/shared';
 import { z } from 'zod';
+import { type HostRule, matchRule, parseHostRule } from '../cameras/allowlist';
 
 const priority = z.number().int().min(0).max(99);
 
@@ -93,15 +94,34 @@ export const ConfigFileSchema = z
     cameras: z.array(CameraConfigSchema).default([]),
     proxy: z
       .object({
-        /** Hostnames the camera proxy may fetch from. Empty means the proxy is off. */
+        /**
+         * Hosts the camera proxy may fetch from: `host`, `host:port`, `*.domain.tld` or an address.
+         * Empty means the proxy is off. See apps/server/src/cameras/allowlist.ts.
+         */
         allowlist: z.array(z.string().min(1)).default([]),
+        /**
+         * Let a host *name* on the allowlist resolve to an address on a private network. Off by default,
+         * so that an outside host cannot point its name at a device on your network. A camera on your own
+         * network is better allowed by listing its address.
+         */
+        allowPrivateAddresses: z.boolean().default(false),
+      })
+      .prefault({}),
+    go2rtc: z
+      .object({
+        /** Address of a go2rtc instance for `webrtc` cameras, e.g. http://go2rtc:1984. Unset: none. */
+        url: z.url().optional(),
       })
       .prefault({}),
     discovery: z
       .object({
         enabled: z.boolean().default(false),
-        /** Minimum hours between discovery runs per airport. YouTube searches cost 100 quota units each. */
+        /** Hours a search result is kept before the same search may be sent again, per airport. */
         intervalHours: z.number().min(6).default(6),
+        /** YouTube: how far from the airport's reference point a live video's location may be. */
+        youtubeRadiusKm: z.number().min(1).max(100).default(10),
+        /** Windy: how far from the airport's reference point a webcam may be. */
+        windyRadiusKm: z.number().min(1).max(250).default(15),
       })
       .prefault({}),
     client: z
@@ -137,8 +157,18 @@ export const ConfigFileSchema = z
       }
       seen.add(a.icao);
     });
+    const rules: HostRule[] = [];
+    cfg.proxy.allowlist.forEach((entry, i) => {
+      try {
+        rules.push(parseHostRule(entry));
+      } catch (err) {
+        ctx.addIssue({ code: 'custom', path: ['proxy', 'allowlist', i], message: (err as Error).message });
+      }
+    });
     const ids = new Set<string>();
     cfg.cameras.forEach((c, i) => {
+      const problem = cameraSourceProblem(c, rules);
+      if (problem) ctx.addIssue({ code: 'custom', path: ['cameras', i, 'source'], message: problem });
       if (ids.has(c.id)) {
         ctx.addIssue({ code: 'custom', path: ['cameras', i, 'id'], message: `duplicate camera id ${c.id}` });
       }
@@ -153,6 +183,49 @@ export const ConfigFileSchema = z
     });
   });
 export type ConfigFile = z.infer<typeof ConfigFileSchema>;
+
+/** A Windy webcam as a snapshot source: `windy:<webcam id>`. The server keeps its image address fresh. */
+export const WINDY_SOURCE = /^windy:(\d{1,12})$/;
+
+/** What is wrong with a camera's `source` for its `kind`, in words for the person editing the config. */
+export function cameraSourceProblem(
+  camera: { id: string; kind: string; source: string; proxy?: boolean },
+  rules: readonly HostRule[],
+): string | null {
+  const { kind, source } = camera;
+  if (kind === 'youtube') {
+    const parsed = parseYouTubeSource(source);
+    if (parsed?.type === 'video') return null;
+    return parsed?.type === 'channel'
+      ? `camera ${camera.id}: a channel cannot be played, only a video. Use the video id of the channel's live stream (the part after "v=" in its address)`
+      : `camera ${camera.id}: a youtube source is the video id of the live stream, or its YouTube address`;
+  }
+  if (kind === 'webrtc') {
+    return /^[A-Za-z0-9_.-]{1,64}$/.test(source)
+      ? null
+      : `camera ${camera.id}: a webrtc source is the name of a go2rtc stream (letters, digits, ".", "_" and "-")`;
+  }
+  if (kind === 'snapshot' && WINDY_SOURCE.test(source)) return null;
+  let url: URL;
+  try {
+    url = new URL(source);
+  } catch {
+    return `camera ${camera.id}: the source of a ${kind} camera must be an http or https address`;
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return `camera ${camera.id}: the source of a ${kind} camera must be an http or https address`;
+  }
+  if (camera.proxy) {
+    if (kind === 'iframe') return `camera ${camera.id}: an iframe camera cannot be proxied`;
+    if (!matchRule(url, rules)) {
+      return `camera ${camera.id} is proxied, but ${url.host} is not on proxy.allowlist`;
+    }
+  } else if (url.username || url.password) {
+    // Without the proxy the address goes to every viewer's browser as it is.
+    return `camera ${camera.id}: the source contains a user name or password; set "proxy: true" so it stays on the server`;
+  }
+  return null;
+}
 
 /** The config file with environment overrides applied. This is what the rest of the server reads. */
 export type AppConfig = ConfigFile;

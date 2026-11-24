@@ -1,9 +1,12 @@
 import type { AirportSummary } from '@towercab/shared';
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { api } from './api';
 import { AirportPage } from './pages/AirportPage';
 import { DebugPage } from './pages/DebugPage';
 import { navigate, useRoute } from './router';
+
+// Few people ever open the admin page; it is fetched when they do.
+const AdminPage = lazy(() => import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })));
 
 /** Landing page: the configured airports. */
 function Home() {
@@ -60,6 +63,18 @@ export function App() {
       return <DebugPage icao={route.icao} />;
     case 'airport':
       return <AirportPage icao={route.icao} />;
+    case 'admin':
+      return (
+        <Suspense
+          fallback={
+            <main className="placeholder">
+              <p className="muted">Loading…</p>
+            </main>
+          }
+        >
+          <AdminPage />
+        </Suspense>
+      );
     default:
       return (
         <main className="placeholder">

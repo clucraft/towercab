@@ -22,6 +22,11 @@ export function buildAttributions(services: Services): ClientConfig['attribution
   list.push({ name: 'OurAirports', url: 'https://ourairports.com/data/' });
   list.push({ name: 'aviationweather.gov', url: 'https://aviationweather.gov' });
   if (photos.enabled) list.push({ name: 'planespotters.net', url: 'https://www.planespotters.net' });
+  // Camera providers are credited when one of their cameras is actually shown.
+  const shown = services.cameras.registry.providersInUse();
+  if (shown.has('windy'))
+    list.push({ name: 'Windy.com', url: 'https://www.windy.com/webcams', note: 'webcams' });
+  if (shown.has('youtube')) list.push({ name: 'YouTube', url: 'https://www.youtube.com' });
   return list;
 }
 
@@ -64,19 +69,13 @@ export function registerApiRoutes(app: FastifyInstance, services: Services): voi
       features: {
         photoreal: Boolean(secrets.cesiumIonToken || secrets.googleMapsApiKey),
         terrain: Boolean(secrets.cesiumIonToken),
-        cameras: current.cameras.some((c) => c.enabled),
+        cameras: services.cameras.registry.any(),
         admin: Boolean(secrets.adminToken),
         photos: current.photos.enabled,
       },
       renderDelayMs: current.client.renderDelayMs,
       attributions: buildAttributions(services),
     };
-  });
-
-  app.get<{ Params: { icao: string } }>('/api/cameras/:icao', async (request, reply) => {
-    const icao = airportParam(request.params.icao, reply);
-    if (!icao) return reply;
-    return config.current.cameras.filter((c) => c.airport === icao && c.enabled);
   });
 
   app.get<{ Params: { icao: string } }>('/api/metar/:icao', async (request, reply) => {

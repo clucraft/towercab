@@ -9,8 +9,8 @@ _Screenshots are added with the first release._
 ## Status
 
 Working: live traffic from public sources or your own receiver, the 3D scene in two base maps (Photoreal and
-Schematic), views, labels, trails, the side panel (aircraft list, weather, source health) and replay. Still to
-come: live cameras, the Unraid template and published images. See [docs/PLAN.md](docs/PLAN.md) for the phase
+Schematic), views, labels, trails, the side panel (aircraft list, weather, source health), replay, and live
+cameras with an admin page. Still to come: the Unraid template and published images. See [docs/PLAN.md](docs/PLAN.md) for the phase
 checklist and [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
 
 ## Quick start
@@ -35,6 +35,7 @@ On first start the server copies [config/config.example.yaml](config/config.exam
 | `3`      | Next runway end (press again for the next one) |
 | `4`      | Orbit the field                                |
 | `5`, `F` | Follow the selected aircraft                   |
+| `C`      | Open or close the cameras                      |
 | `S`      | Switch between Photoreal and Schematic         |
 | `Esc`    | Clear the selection                            |
 
@@ -49,6 +50,17 @@ Add these to an airport URL:
 | `?fps`                 | Show the frame rate.                                                        |
 
 `/debug/KLAF` shows the same traffic as a table with source health, and `/metrics` has Prometheus metrics.
+
+### Cameras
+
+TowerCab ships with no cameras: add the streams you have checked yourself. A camera can be a YouTube live
+video, an HLS or MJPEG stream, a picture that reloads, a page in a frame, or your own RTSP camera through
+[go2rtc](https://github.com/AlexxIT/go2rtc). It shows in a window over the 3D view, beside it, in a grid, or,
+once you have told TowerCab where the camera stands, as an overlay with the aircraft labels drawn over the
+picture. The `/admin` page (set `ADMIN_TOKEN`) places cameras in the scene with the mouse and can search
+YouTube and Windy for cameras near an airport; nothing it finds is shown until you approve it.
+
+[docs/ADDING_A_CAMERA.md](docs/ADDING_A_CAMERA.md) has the details.
 
 ### Replay
 
@@ -98,8 +110,8 @@ Every variable is optional. See [.env.example](.env.example).
 | `GOOGLE_MAPS_API_KEY`                        | Google Map Tiles API key, as an alternative to ion.               |
 | `ADSBLOL_API_KEY`                            | adsb.lol API key. Without one adsb.lol allows 500 requests a day. |
 | `OPENSKY_CLIENT_ID`, `OPENSKY_CLIENT_SECRET` | OpenSky OAuth2 client credentials (fallback source).              |
-| `YOUTUBE_API_KEY`, `WINDY_API_KEY`           | Camera discovery (admin only).                                    |
-| `ADMIN_TOKEN`                                | Enables `/admin`. Admin routes are off when unset.                |
+| `YOUTUBE_API_KEY`, `WINDY_API_KEY`           | Camera discovery on the admin page; Windy webcam pictures.        |
+| `ADMIN_TOKEN`                                | Enables `/admin`. Admin routes do not exist when unset.           |
 
 ## Data sources
 

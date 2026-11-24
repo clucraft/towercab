@@ -126,11 +126,13 @@ towercab/
 
 ### Phase 4: Cameras
 
-- [ ] Camera registry + players (YouTube, HLS, MJPEG, snapshot, iframe, go2rtc)
-- [ ] PiP, split and grid layouts
-- [ ] View cones, Match view, overlay mode
-- [ ] Allowlisted proxy, go2rtc compose profile
-- [ ] Admin page: discovery (YouTube, Windy), approval queue, pose editor
+- [x] Camera registry + players (YouTube, HLS, MJPEG, snapshot, iframe, go2rtc)
+- [x] PiP, split and grid layouts
+- [x] View cones, Match view, overlay mode
+- [x] Allowlisted proxy, go2rtc compose profile
+- [x] Admin page: discovery (YouTube, Windy), approval queue, pose editor
+- [x] `docs/ADDING_A_CAMERA.md`
+- [ ] Discovery checked against real YouTube and Windy results (needs API keys; see DECISIONS D-052)
 
 ### Phase 5: Ship
 

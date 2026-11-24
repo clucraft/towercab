@@ -1,6 +1,7 @@
-import type { AirportDetail, AirportSummary, ClientConfig, Metar } from '@towercab/shared';
+import type { AirportDetail, AirportSummary, ClientConfig, Metar, PublicCamera } from '@towercab/shared';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { api } from '../api';
+import { CAMERA_LAYOUTS, CameraDock, type CameraLayout } from '../cameras/CameraDock';
 import { replayFeed } from '../live/replayFeed';
 import { type FeedFactory, LiveStore, webSocketFeed } from '../live/store';
 import { navigate, setQuery, useLocation } from '../router';
@@ -101,6 +102,14 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
   const [trails, setTrails] = useState(true);
   const [panelOpen, setPanelOpen] = useState(() => !window.matchMedia(SMALL_SCREEN).matches);
   const [metar, setMetar] = useState<Metar | null>(null);
+  const [cameras, setCameras] = useState<PublicCamera[]>([]);
+  const [camOpen, setCamOpen] = useState(initial.has('cam'));
+  const [camId, setCamId] = useState<string | null>(initial.get('cam') || null);
+  const [camLayout, setCamLayout] = useState<CameraLayout>(() => {
+    const wanted = initial.get('camlayout') as CameraLayout | null;
+    return wanted && CAMERA_LAYOUTS.includes(wanted) ? wanted : 'pip';
+  });
+  const [camAspect, setCamAspect] = useState<number | null>(null);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [stats, setStats] = useState<SceneStats | null>(null);
   const [, setTick] = useState(0);
@@ -145,7 +154,13 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
             onView: (v) => {
               if (cancelled) return;
               setView(v);
-              setQuery({ view: v === 'free' ? null : v });
+              // Looking through a camera is part of the camera state, not a view of its own.
+              setQuery({ view: v === 'free' || v.startsWith('cam:') ? null : v });
+            },
+            onCameraPick: (id) => {
+              if (cancelled) return;
+              setCamId(id);
+              setCamOpen(true);
             },
             onNotice: (text) => {
               if (!cancelled) notify(text);
@@ -216,6 +231,62 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
     };
   }, [airport.icao]);
 
+  // Cameras: the list, then keeping the scene and the address bar in step with what is on show.
+  useEffect(() => {
+    if (!config.features.cameras) return;
+    const controller = new AbortController();
+    api
+      .cameras(airport.icao, controller.signal)
+      .then((response) => setCameras(response.cameras))
+      .catch(() => {
+        // Without the list there is simply no camera button.
+      });
+    return () => controller.abort();
+  }, [airport.icao, config.features.cameras]);
+
+  const activeCamera = cameras.find((c) => c.id === camId) ?? cameras[0];
+  const showing = camOpen && activeCamera !== undefined;
+  // Overlay needs to know where the camera is; without a pose it falls back to a window.
+  const layout: CameraLayout = camLayout === 'overlay' && !activeCamera?.pose ? 'pip' : camLayout;
+  const activeId = activeCamera?.id ?? null;
+  const overlaying = showing && layout === 'overlay';
+
+  useEffect(() => {
+    if (ready) sceneRef.current?.setCameras(cameras);
+  }, [ready, cameras]);
+
+  useEffect(() => {
+    if (ready) sceneRef.current?.setActiveCamera(showing ? activeId : null);
+  }, [ready, showing, activeId]);
+
+  // A new camera has a picture of its own shape.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on every change of camera
+  useEffect(() => setCamAspect(null), [activeId]);
+
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!ready || !scene) return;
+    if (overlaying && activeId) scene.matchCamera(activeId, { overlay: true, aspect: camAspect });
+    // Leaving the overlay, closing the cameras or changing camera gives the 3D view back.
+    else if (scene.matchedCamera && scene.matchedCamera !== activeId) scene.endMatch();
+    else if (scene.matchedCamera && !showing) scene.endMatch();
+    return () => {
+      if (overlaying) scene.endMatch();
+    };
+  }, [ready, overlaying, showing, activeId, camAspect]);
+
+  useEffect(() => {
+    setQuery({
+      cam: showing ? activeId : null,
+      camlayout: showing && layout !== 'pip' ? layout : null,
+    });
+  }, [showing, activeId, layout]);
+
+  const toggleCameras = useCallback(() => {
+    if (cameras.length === 0) notify(`No cameras are set up for ${airport.icao}.`);
+    else setCamOpen((open) => !open);
+  }, [cameras.length, airport.icao, notify]);
+
   // Ages count up between updates; the frame rate badge refreshes.
   useEffect(() => {
     const timer = setInterval(() => {
@@ -242,6 +313,8 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
         else notify('Select an aircraft to follow.');
       } else if (key === 's') {
         void scene.setMode(scene.mode === 'schematic' ? 'photoreal' : 'schematic');
+      } else if (key === 'c') {
+        toggleCameras();
       } else if (key === 'escape') {
         scene.select(null);
       } else {
@@ -251,7 +324,7 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selected, notify]);
+  }, [selected, notify, toggleCameras]);
 
   const selectedAircraft = selected ? store.aircraft.get(selected) : undefined;
   const now = store.serverNow();
@@ -274,6 +347,8 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
         hasSelection={Boolean(selected)}
         trails={trails}
         panelOpen={panelOpen}
+        cameras={cameras.length}
+        camerasOpen={showing}
         onAirport={(next) => navigate(`/${next}`)}
         onMode={changeMode}
         onView={changeView}
@@ -282,10 +357,11 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
           sceneRef.current?.setTrails(enabled);
         }}
         onPanel={() => setPanelOpen((open) => !open)}
+        onCameras={toggleCameras}
       />
 
       <div className={`workspace${panelOpen ? ' with-panel' : ''}`}>
-        <div className="stage">
+        <div className={`stage${showing && layout === 'split' ? ' split' : ''}`}>
           <div className="scene" ref={containerRef} data-testid="scene" />
           {!ready && <div className="scene-loading muted">Starting the 3D scene…</div>}
 
@@ -315,6 +391,26 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
               </span>
             )}
           </div>
+
+          {showing && (
+            <CameraDock
+              cameras={cameras}
+              activeId={activeId}
+              layout={layout}
+              matched={activeId !== null && view === `cam:${activeId}`}
+              overlayHost={containerRef.current}
+              onSelect={setCamId}
+              onLayout={setCamLayout}
+              onMatch={() => {
+                const scene = sceneRef.current;
+                if (!scene || !activeId) return;
+                if (scene.matchedCamera === activeId) scene.endMatch();
+                else scene.matchCamera(activeId);
+              }}
+              onAspect={setCamAspect}
+              onClose={() => setCamOpen(false)}
+            />
+          )}
 
           {selectedAircraft && (
             <SelectionPanel

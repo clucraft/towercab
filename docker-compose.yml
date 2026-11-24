@@ -29,6 +29,25 @@ services:
       - towercab-config:/config
       - towercab-data:/data
 
+  # Optional: your own RTSP camera, made playable in the browser by go2rtc.
+  #   mkdir go2rtc && cp docker/go2rtc.example.yaml go2rtc/go2rtc.yaml   (then add your camera to it)
+  #   docker compose --profile cameras up -d
+  # and in TowerCab's config.yaml:  go2rtc: { url: "http://go2rtc:1984" }
+  go2rtc:
+    image: alexxit/go2rtc:1.9.15
+    container_name: towercab-go2rtc
+    profiles: ["cameras"]
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-UTC}
+    volumes:
+      - ${GO2RTC_CONFIG_DIR:-./go2rtc}:/config # the folder that holds go2rtc.yaml
+    ports:
+      # WebRTC media. go2rtc's API (port 1984) is deliberately not published: it can change go2rtc's
+      # configuration and start programs. TowerCab talks to it inside this compose network.
+      - "8555:8555/tcp"
+      - "8555:8555/udp"
+
 volumes:
   towercab-config:
   towercab-data:

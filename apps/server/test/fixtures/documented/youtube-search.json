@@ -1,0 +1,75 @@
+{
+  "kind": "youtube#searchListResponse",
+  "etag": "example-etag",
+  "nextPageToken": "CBkQAA",
+  "regionCode": "US",
+  "pageInfo": { "totalResults": 4, "resultsPerPage": 25 },
+  "items": [
+    {
+      "kind": "youtube#searchResult",
+      "etag": "example-etag-1",
+      "id": { "kind": "youtube#video", "videoId": "AAAAAAAAAAA" },
+      "snippet": {
+        "publishedAt": "2026-11-20T12:00:00Z",
+        "channelId": "UCaaaaaaaaaaaaaaaaaaaaaa",
+        "title": "Example Field &amp; Tower Cam &#39;LIVE&#39; 24/7",
+        "description": "A live view of the ramp at Example Field.",
+        "thumbnails": {
+          "default": { "url": "https://thumbs.example.test/AAAAAAAAAAA/default.jpg", "width": 120, "height": 90 },
+          "medium": { "url": "https://thumbs.example.test/AAAAAAAAAAA/medium.jpg", "width": 320, "height": 180 },
+          "high": { "url": "https://thumbs.example.test/AAAAAAAAAAA/high.jpg", "width": 480, "height": 360 }
+        },
+        "channelTitle": "Example Spotters",
+        "liveBroadcastContent": "live",
+        "publishTime": "2026-11-20T12:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#searchResult",
+      "etag": "example-etag-2",
+      "id": { "kind": "youtube#video", "videoId": "BBBBBBBBBBB" },
+      "snippet": {
+        "publishedAt": "2026-11-24T18:00:00Z",
+        "channelId": "UCbbbbbbbbbbbbbbbbbbbbbb",
+        "title": "Runway 23 approach",
+        "description": "",
+        "thumbnails": {
+          "default": { "url": "https://thumbs.example.test/BBBBBBBBBBB/default.jpg", "width": 120, "height": 90 }
+        },
+        "channelTitle": "Another Channel",
+        "liveBroadcastContent": "live",
+        "publishTime": "2026-11-24T18:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#searchResult",
+      "etag": "example-etag-3",
+      "id": { "kind": "youtube#video", "videoId": "CCCCCCCCCCC" },
+      "snippet": {
+        "publishedAt": "2026-11-24T19:00:00Z",
+        "channelId": "UCcccccccccccccccccccccc",
+        "title": "Starting tomorrow",
+        "description": "",
+        "thumbnails": {},
+        "channelTitle": "Upcoming Channel",
+        "liveBroadcastContent": "upcoming",
+        "publishTime": "2026-11-24T19:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#searchResult",
+      "etag": "example-etag-4",
+      "id": { "kind": "youtube#channel", "channelId": "UCdddddddddddddddddddddd" },
+      "snippet": {
+        "publishedAt": "2020-01-01T00:00:00Z",
+        "channelId": "UCdddddddddddddddddddddd",
+        "title": "A channel, not a video",
+        "description": "",
+        "thumbnails": {},
+        "channelTitle": "A channel, not a video",
+        "liveBroadcastContent": "none",
+        "publishTime": "2020-01-01T00:00:00Z"
+      }
+    }
+  ]
+}

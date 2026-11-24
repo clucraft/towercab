@@ -389,3 +389,127 @@ source through the server's own tracker.
 `gitleaks-action` scans `first-commit^..last-commit` on a push, which fails on the very first push of a
 repository (the first commit has no parent). CI downloads a pinned gitleaks release, checks it against the
 checksum published with that release, and scans the whole history instead.
+
+## Cameras
+
+### D-049 A registry with two sources, and one place that decides what viewers are told
+
+Cameras come from `cameras:` in the config file and from the discovery queue once approved (SQLite). The
+registry merges them and is the only code that builds what `/api/cameras/:icao` returns. A viewer's browser
+gets a camera's own address only when it is meant to load it directly; a proxied camera is known to it only as
+`/proxy/camera/<id>`, and a camera that cannot play (no go2rtc address, no Windy key, a source that does not
+fit its kind) arrives with the reason instead of an address. The config loader refuses the same mistakes up
+front, so they are found when the file is edited rather than when someone opens the camera.
+
+### D-050 The proxy cannot be used as an open proxy (Verified by tests)
+
+The prompt's rule, made concrete in `cameras/proxy.ts` and `routes/cameras.ts`:
+
+- only `GET`; only http and https; only cameras marked `proxy: true`, addressed by id;
+- only hosts on `proxy.allowlist` (`host`, `host:port`, `*.domain.tld`, or an address), re-checked on every
+  redirect, at most three of them;
+- a host name on the list may not resolve to a private, loopback or link-local address unless
+  `proxy.allowPrivateAddresses` is set. The check runs inside the connection's own DNS lookup, so a name
+  cannot be re-pointed between check and use. A camera on the home network is allowed by listing its address;
+- a browser never supplies an address. Things an HLS playlist refers to are fetched through
+  `/proxy/camera/<id>/r?u=…&s=…`, where `u` is an address the server itself wrote into that camera's playlist
+  and `s` is an HMAC over camera id and address with a key made at start-up;
+- nothing of the viewer's request goes to the camera except a well-formed byte range, and nothing of the
+  camera's headers comes back except content type, length and range. A snapshot must be an image, an MJPEG
+  stream must be `multipart/x-mixed-replace`, a playlist must start with `#EXTM3U`, a segment must be media;
+- refusals tell the viewer nothing about hosts or addresses; the detail goes to the server log.
+
+Tested against real HTTP servers on the loopback interface (`cameraProxy.test.ts`, `cameraRoutes.test.ts`) and,
+by hand, against go2rtc and an ffmpeg HLS stream.
+
+### D-051 YouTube: video ids only; the channel "live" embed is not offered (Deviation, Verified)
+
+The prompt allows "a live video ID or a channel's live embed". The player is the documented IFrame Player API
+(`https://www.youtube.com/iframe_api`, `new YT.Player`, `mute()` then `playVideo()` on ready, `onError` codes
+2, 5, 100, 101, 150, 153). A real 24/7 airport stream played through it on 2026-11-24.
+
+The channel form (`https://www.youtube.com/embed/live_stream?channel=<id>`) is not in Google's player
+parameter documentation. Tried the same day with two channels that were live, one with several streams and one
+with a single stream, it showed "This video is unavailable" both times while those channels' videos played by
+id. So a `youtube` source must be a video id or a video's address; the config loader recognises a channel and
+says what to use instead. The cost: a stream that restarts gets a new id and the entry has to be updated (or
+discovery run again). Resolving a channel's current live video through the Data API would fix that and is left
+for later.
+
+### D-052 YouTube and Windy discovery follow the documentation; real results were never seen (Unverified)
+
+No API keys were available, so:
+
+- Verified live: the endpoints exist and answer without a key and with a made-up key exactly as saved in
+  `test/fixtures/youtube-error-*.json` and `windy-error-*.json`. The YouTube Data API reads the key from the
+  `X-Goog-Api-Key` header (a made-up key in the header gets "API key not valid", no key gets "Permission
+  denied"), so the key is sent there and never appears in an address or a log line. Windy names its header in
+  its own error message: `x-windy-api-key`.
+- Not verified: the shape of successful responses. The parsers are written from the documentation
+  (`search.list` with `part=snippet`, `type=video`, `eventType=live`, `location`, `locationRadius`, `q`; Windy
+  `GET /webcams/api/v3/webcams?nearby=lat,lon,km&include=images,location,urls` and `/webcams/{id}`), take only
+  the fields they need, and are tested against hand-written fixtures kept apart in `test/fixtures/documented/`.
+
+Differences from the prompt, from the documentation as read on 2026-11-24:
+
+- `search.list` is now documented with its own allowance of 100 calls a day at one unit each, not 100 units
+  per call. A search for one airport is four calls.
+- Windy's documentation says a free-tier image address expires after 10 minutes; its pricing page says 15.
+  The server asks for a fresh one once its copy is 8 minutes old.
+
+Windy's terms shaped the design: the picture is loaded by the browser from the address Windy issued (the
+server answers `/api/cameras/<id>/image` with a redirect to it, and does not pass the picture through),
+it is never drawn larger than it is, it links to the webcam's page, and Windy is credited.
+
+### D-053 Discovery runs when asked, not on a timer (Deviation)
+
+The prompt says to run discovery "at most every 6 hours per airport and cache the results". It runs when an
+admin presses the button, and the same search is not sent again inside `discovery.intervalHours`; in between,
+the stored results are what the page shows. A timer would spend a small daily allowance on results nobody is
+waiting to review. After a failed search the next try is allowed after ten minutes.
+
+### D-054 The camera queue is SQLite through better-sqlite3 12, not 13
+
+`/data/towercab.db` holds the queue, the poses set on the admin page and the time of each search. Version
+12.11.1 is pinned because it installs a prebuilt binary for Node 24 on every platform involved (Windows x64,
+Linux x64, Alpine x64 and arm64 were checked in its release); version 13 compiles from source on every install
+and needs a C++ toolchain, which the development machine does not have. If the database cannot be opened the
+server says so and runs on: cameras from the config file still work.
+
+### D-055 The admin API
+
+Off unless `ADMIN_TOKEN` is set: without it every `/admin/api/*` path answers with the same 404 as a path that
+never existed. With it, each request carries the token as a bearer token (so there is no cookie for another
+site to ride on), compared in constant time; ten wrong tokens from one address lock that address out for ten
+minutes. The page keeps the token in the tab's session storage. A pose saved on the page for a camera from the
+config file is stored in the database and takes precedence over the file until it is removed on the page; the
+page says so.
+
+### D-056 go2rtc is reached only through TowerCab
+
+go2rtc's API can rewrite its configuration and start programs, and its README warns about exposing it. The
+compose profile does not publish its port. TowerCab passes on two things: go2rtc's own player script
+(`video-rtc.js`, `video-stream.js`, so the player always matches the go2rtc that is running), and the stream
+WebSocket `/api/ws?src=<name>` for a name that belongs to an enabled `webrtc` camera; `dst` (publishing) is
+never passed on. Everything is same-origin, so it works behind Zoraxy and over https. Checked with go2rtc
+1.9.15 and a synthetic stream: video arrives over the WebSocket (MSE); direct WebRTC needs `webrtc.candidates`
+set in go2rtc, because inside a container it cannot know the host's address.
+
+go2rtc's own HLS output was a poor test source: on a cold start its first segments could not be parsed by
+hls.js, and its playlist holds one second. The HLS player was tested against an ffmpeg stream instead, and
+gained a watchdog that restarts a stream after ten seconds without progress.
+
+### D-057 View cones, Match view, overlay
+
+A camera with a pose is drawn as a 450 m view cone. Match view gives the 3D camera the pose and the camera's
+horizontal field of view. In overlay mode the picture sits between the 3D canvas and the label canvas, fitted
+whole into the view; the 3D field of view is widened when the view is wider than the picture so the two line
+up, and the mouse is locked out so they stay lined up. A picture whose shape is not known (YouTube, framed
+pages) is taken as 16:9. Lens distortion is not modelled, so labels drift towards the edges of a wide-angle
+picture. The pose editor on the admin page: click the ground to place the camera, drag one handle for
+direction and one for field of view, sliders for tilt and height.
+
+### D-058 Shutting down does not wait for open connections
+
+Someone watching an MJPEG camera holds a connection open for as long as they watch. The server now closes all
+connections on shutdown (`forceCloseConnections`), so `docker stop` is not held up until the kill time-out.

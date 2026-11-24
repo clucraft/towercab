@@ -115,7 +115,12 @@ function summarise(body: string): string {
   if (!text) return '';
   try {
     const parsed = JSON.parse(text) as Record<string, unknown>;
-    const msg = parsed.error ?? parsed.message ?? parsed.msg ?? parsed.detail;
+    // The most specific text first: Google nests it (`error.message`), Windy sends `message` next to a
+    // generic `error`, the aggregators send `error` or `msg` alone.
+    const nested = (parsed.error as { message?: unknown } | null | undefined)?.message;
+    const msg = [nested, parsed.message, parsed.error, parsed.msg, parsed.detail].find(
+      (candidate) => typeof candidate === 'string' && candidate !== '',
+    );
     if (typeof msg === 'string') return msg.slice(0, 200);
   } catch {
     // not JSON: fall through to plain text

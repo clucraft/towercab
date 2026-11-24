@@ -18,6 +18,8 @@ export interface HubDeps {
   live: LiveService;
   airports: AirportService;
   version: string;
+  /** Offered every upgrade request that is not for the live feed. True: it took the request over. */
+  otherUpgrade?: (request: IncomingMessage, socket: Duplex, head: Buffer) => boolean;
   now?: () => number;
   /** Deltas for one airport go out at most this often. */
   minDeltaIntervalMs?: number;
@@ -104,7 +106,7 @@ export class WsHub {
   private onUpgrade = (request: IncomingMessage, socket: Duplex, head: Buffer): void => {
     const path = (request.url ?? '').split('?')[0];
     if (path !== WS_PATH) {
-      socket.destroy();
+      if (!this.deps.otherUpgrade?.(request, socket, head)) socket.destroy();
       return;
     }
     if (this.clients.size >= this.maxClients) {

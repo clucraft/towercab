@@ -11,6 +11,8 @@ coverage/
 .env.*
 !.env.example
 /data/
+# go2rtc.yaml for the `cameras` compose profile: it holds your cameras' addresses and passwords.
+/go2rtc/
 .local/
 /config/config.yaml
 /config/*.local.yaml

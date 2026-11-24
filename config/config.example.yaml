@@ -44,18 +44,46 @@ polling:
   pauseWhenNoViewersAfterMs: 300000 # then stop polling completely
   secondaryEveryN: 3 # the preferred public source is polled every cycle, the rest every Nth
 
-# Live cameras. Ships empty on purpose: add only streams you have checked yourself.
-# See docs/ADDING_A_CAMERA.md for the fields.
+# Live cameras. Ships empty on purpose: there is no dependable list of public streams for these
+# airports, so add only streams you have checked yourself. docs/ADDING_A_CAMERA.md explains every field.
+#
+# cameras:
+#   - id: ramp                      # letters, digits, "-" and "_"; used in addresses
+#     airport: KLAF
+#     name: Ramp, looking north
+#     kind: youtube                 # youtube | hls | mjpeg | snapshot | iframe | webrtc
+#     source: "VIDEO_ID"            # youtube: the video id of the live stream
+#                                   # hls / mjpeg / snapshot / iframe: an http(s) address
+#                                   # snapshot: also "windy:<webcam id>" (needs WINDY_API_KEY)
+#                                   # webrtc: the name of a stream in go2rtc
+#     attribution: Who runs the camera
+#     link: "https://example.org/the-camera-page"
+#     proxy: false                  # hls / mjpeg / snapshot: fetch through this server (see `proxy` below)
+#     refreshSeconds: 30            # snapshot: seconds between pictures
+#     # Where the camera is and where it points. Optional; easiest to set on the /admin page.
+#     pose: { lat: 40.4148, lon: -86.9333, heightM: 12, headingDeg: 230, pitchDeg: -4, hfovDeg: 55 }
 cameras: []
 
-# The server proxies camera streams only for hostnames listed here. Empty = proxy off.
+# The server fetches camera media on a browser's behalf only for cameras marked `proxy: true`, and
+# only from the hosts listed here: "host", "host:port", "*.domain.tld" or an address such as
+# "192.168.1.20:8080". Empty = the proxy is off.
 proxy:
   allowlist: []
+  # Let a host *name* on the list resolve to an address on a private network. Leave this off and list
+  # the address itself for a camera on your own network.
+  allowPrivateAddresses: false
 
-# Camera discovery (admin only). Needs ADMIN_TOKEN plus YOUTUBE_API_KEY and/or WINDY_API_KEY.
+# go2rtc, for `webrtc` cameras (your own RTSP camera). See the `cameras` profile in docker-compose.yml.
+# go2rtc:
+#   url: "http://go2rtc:1984"
+
+# Camera discovery, run from the /admin page. Needs ADMIN_TOKEN plus YOUTUBE_API_KEY and/or
+# WINDY_API_KEY. Nothing it finds is shown until you approve it there.
 discovery:
   enabled: false
-  intervalHours: 6
+  intervalHours: 6 # a search is sent at most this often per airport; the last results are kept
+  youtubeRadiusKm: 10 # live videos located this close to the airport
+  windyRadiusKm: 15 # webcams this close to the airport
 
 # Browsers draw the scene this far behind real time, so there is always a newer position to move towards.
 client:
