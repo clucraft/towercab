@@ -79,7 +79,10 @@ export class MetarService {
 
   /** The current report, fetching it first when the cached one has expired. */
   async get(icao: string): Promise<Metar | null> {
-    if (this.isDue(icao)) await this.refresh(icao);
+    // Several browsers opening the same airport at once share one fetch, and all of them wait for it.
+    const running = this.inFlight.get(icao);
+    if (running) await running;
+    else if (this.isDue(icao)) await this.refresh(icao);
     return this.cache.get(icao) ?? null;
   }
 

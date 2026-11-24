@@ -24,7 +24,8 @@
     "probe": "tsx scripts/probe.ts",
     "verify:scene": "tsx scripts/verify-scene.ts",
     "test:e2e": "playwright test",
-    "record": "tsx scripts/record.ts"
+    "record": "tsx scripts/record.ts",
+    "screenshots": "tsx scripts/screenshots.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.9",

@@ -75,16 +75,31 @@ export class ConfigStore extends EventEmitter<ConfigStoreEvents> {
 
   static async open(options: ConfigStoreOptions): Promise<ConfigStore> {
     const file = join(options.configDir, 'config.yaml');
-    await mkdir(options.configDir, { recursive: true });
+    let text: string | null = null;
     if (!(await exists(file))) {
       if (!options.exampleFile) {
         throw new ConfigError(`${file} does not exist and no example config was found to copy`);
       }
-      // Written rather than copied so the new file gets normal permissions, whatever the example's mode is.
-      await writeFile(file, await readFile(options.exampleFile), { mode: 0o644, flag: 'wx' });
-      options.log?.info({ file }, 'no config found, copied the example config');
+      const example = await readFile(options.exampleFile);
+      try {
+        await mkdir(options.configDir, { recursive: true });
+        // Written rather than copied so the new file gets normal permissions, whatever the example's mode is.
+        await writeFile(file, example, { mode: 0o644, flag: 'wx' });
+        options.log?.info({ file }, 'no config found, copied the example config');
+      } catch (err) {
+        if (!isNotWritable(err)) throw err;
+        // A folder mounted from the host that this user may not write to (Docker creates a missing host
+        // folder as root). Start anyway, with the example as it ships; the file is picked up as soon as
+        // it exists.
+        text = example.toString('utf8');
+        options.log?.warn(
+          { file, user: process.getuid?.(), err: (err as Error).message },
+          'the config folder is not writable: running with the built-in example config. ' +
+            'Give this user write access to the folder (or put a config.yaml there) to change settings',
+        );
+      }
     }
-    const initial = parseConfig(await readFile(file, 'utf8'), options.envSecrets);
+    const initial = parseConfig(text ?? (await readFile(file, 'utf8')), options.envSecrets);
     return new ConfigStore(file, initial, options);
   }
 
@@ -132,6 +147,11 @@ export class ConfigStore extends EventEmitter<ConfigStoreEvents> {
     }
     void this.reload();
   };
+}
+
+/** Errors that mean "you may not write here", as opposed to something being broken. */
+function isNotWritable(err: unknown): boolean {
+  return ['EACCES', 'EPERM', 'EROFS'].includes((err as NodeJS.ErrnoException).code ?? '');
 }
 
 async function exists(path: string): Promise<boolean> {

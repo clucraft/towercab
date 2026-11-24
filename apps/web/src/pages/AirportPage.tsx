@@ -256,7 +256,10 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
   }, [ready, cameras]);
 
   useEffect(() => {
-    if (ready) sceneRef.current?.setActiveCamera(showing ? activeId : null);
+    if (!ready) return;
+    sceneRef.current?.setActiveCamera(showing ? activeId : null);
+    // View cones are drawn only while cameras are on show; the rest of the time a marker is enough.
+    sceneRef.current?.setConesVisible(showing);
   }, [ready, showing, activeId]);
 
   // A new camera has a picture of its own shape.

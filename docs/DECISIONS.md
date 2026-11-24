@@ -513,3 +513,61 @@ direction and one for field of view, sliders for tilt and height.
 
 Someone watching an MJPEG camera holds a connection open for as long as they watch. The server now closes all
 connections on shutdown (`forceCloseConnections`), so `docker stop` is not held up until the kill time-out.
+
+## Shipping
+
+### D-059 The receiver images are not pinned
+
+`ghcr.io/sdr-enthusiasts/docker-adsb-ultrafeeder` and `docker-dump978` are used at `latest`, against the rule
+to pin dependencies: the project's own documentation and compose examples use the rolling tag. They are
+optional companions in a compose profile, not part of TowerCab's image. Everything in the profile (image
+names, the USB device rules, the environment variables, `adsb,dump978,30978,uat_in`) is taken from their
+READMEs as read on 2026-11-24.
+
+### D-060 Screenshots show Schematic only
+
+`pnpm screenshots` captures the README pictures from a running server with Playwright. They are taken in
+Schematic mode with the shipped recording, so they hold only open data. Photoreal is left out because Google's
+3D tiles may be displayed but not stored, and the aircraft photo in the details card is blanked because it
+belongs to its photographer. The camera picture shows a go2rtc test pattern: there is no real camera to show.
+
+### D-061 The Unraid template and the reverse proxy were written, not tried (Unverified)
+
+`unraid/towercab.xml` follows the template guide at selfhosters.net and two current templates (element names,
+`Config` attributes, `[IP]:[PORT:8790]`). It has not been loaded on an Unraid server. The folder for user
+templates could only be found in a summary of the Unraid forum's Docker FAQ, not in Unraid's documentation,
+and the README says so. Zoraxy was not available either: its README states that WebSockets are proxied
+automatically, and nothing in TowerCab needs more than that.
+
+### D-062 The server starts even when it cannot write to its folders
+
+Docker creates a missing host folder as root, and the container runs as an ordinary user, so a first
+`docker run -v /some/new/folder:/config` used to end with "permission denied". Now an unwritable config folder
+means the built-in example config (and the file is picked up as soon as it appears), and an unwritable data
+folder means a temporary one. Both say so in the log, with the user id to give access to. Checked in a
+container with root-owned bind mounts, with `--user 99:100`, and with a read-only config mount.
+
+### D-063 Release workflow
+
+Every push to main builds amd64 and arm64 and pushes `latest` and `sha-<commit>` to
+`ghcr.io/clucraft/towercab`; a `v*.*.*` tag adds the version and `major.minor`. arm64 is built under QEMU,
+which is slow but needs no second runner. GitHub creates a new package as private: making it public, so that
+Unraid can pull it without a login, is a one-time step for the repository owner.
+
+### D-064 View cones appear with the cameras, not all the time (Deviation)
+
+The prompt has cameras with a pose "appear as see-through view cones in the scene". Drawn permanently, a few
+cones 450 m long cover a small airfield. A camera is always marked by a dot that opens it when clicked; the
+cones and names are drawn while the cameras are open, and on the admin page.
+
+### D-065 The local receiver path has never seen a receiver (Unverified)
+
+The readsb reader is tested against real `aircraft.json` documents from the public services, which use the
+same format. Its reader for readsb's position stream (port 30047) is tested only with a line written by hand
+from readsb's documentation. No RTL-SDR was available, so neither a real ultrafeeder nor the `receiver`
+compose profile has been run. docs/RECEIVER.md says this at the top.
+
+### D-066 Weather for several viewers at once
+
+Found while taking the screenshots: when several browsers opened an airport in the same moment, the first
+request fetched the METAR and the others were told there was none. They now wait for the same fetch.

@@ -1,10 +1,10 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readEnv } from '../src/config/env';
 import { ConfigError, ConfigStore, parseConfig } from '../src/config/loader';
-import { findUp } from '../src/util/paths';
+import { findUp, writableDataDir } from '../src/util/paths';
 
 const exampleFile = findUp(join('config', 'config.example.yaml'));
 
@@ -112,6 +112,54 @@ describe('ConfigStore', () => {
     const store = await ConfigStore.open({ configDir: join(dir, 'nested'), exampleFile });
     expect(store.current.airports).toHaveLength(2);
     expect(await readFile(store.file, 'utf8')).toBe(await readFile(exampleFile as string, 'utf8'));
+  });
+
+  // File modes mean nothing on Windows, and nothing to root: these two run on Linux as an ordinary user,
+  // which is what the container is.
+  const canDeny = process.platform !== 'win32' && process.getuid?.() !== 0;
+
+  it.skipIf(!canDeny)('starts with the example config when the folder cannot be written to', async () => {
+    const locked = join(dir, 'locked');
+    await mkdir(locked);
+    await chmod(locked, 0o555);
+    const warnings: string[] = [];
+    const store = await ConfigStore.open({
+      configDir: locked,
+      exampleFile,
+      log: { info: () => {}, warn: (_obj, msg) => warnings.push(msg), error: () => {} },
+    });
+    expect(store.current.airports.map((a) => a.icao)).toEqual(['KLAF', 'KIND']);
+    expect(warnings.join(' ')).toMatch(/config folder is not writable/);
+    await expect(stat(store.file)).rejects.toThrow();
+
+    // Once the folder is opened up and a file put there, it is read like any other edit.
+    await chmod(locked, 0o755);
+    await writeFile(store.file, 'airports:\n  - icao: KORD\n');
+    await store.reload();
+    expect(store.current.airports.map((a) => a.icao)).toEqual(['KORD']);
+  });
+
+  it.skipIf(!canDeny)(
+    'keeps data in a temporary folder when the data folder cannot be written to',
+    async () => {
+      const locked = join(dir, 'data');
+      await mkdir(locked);
+      await chmod(locked, 0o555);
+      const warnings: string[] = [];
+      const used = await writableDataDir(locked, { warn: (_obj, msg) => warnings.push(msg) });
+      expect(used).not.toBe(locked);
+      expect(used).toContain(tmpdir());
+      expect(warnings.join(' ')).toMatch(/data folder is not writable/);
+      await chmod(locked, 0o755);
+    },
+  );
+
+  it('uses the data folder as given when it can be written to, creating it if need be', async () => {
+    const wanted = join(dir, 'new', 'data');
+    const warnings: string[] = [];
+    expect(await writableDataDir(wanted, { warn: (_obj, msg) => warnings.push(msg) })).toBe(wanted);
+    expect((await stat(wanted)).isDirectory()).toBe(true);
+    expect(warnings).toEqual([]);
   });
 
   it('fails clearly when there is no config and no example', async () => {

@@ -254,6 +254,14 @@ describe('METAR', () => {
     expect(fetchImpl.calls).toHaveLength(2);
   });
 
+  it('answers everyone who asks at the same moment from one fetch', async () => {
+    const fetchImpl = fakeFetch(upstreamRoutes());
+    const service = new MetarService({ userAgent: UA, fetchImpl, now: () => 1_000_000 });
+    const answers = await Promise.all([service.get('KLAF'), service.get('KLAF'), service.get('KLAF')]);
+    expect(answers.map((m) => m?.icao)).toEqual(['KLAF', 'KLAF', 'KLAF']);
+    expect(fetchImpl.calls).toHaveLength(1);
+  });
+
   it('serves the last report when a refresh fails, and waits before retrying', async () => {
     let now = 1_000_000;
     let fail = false;

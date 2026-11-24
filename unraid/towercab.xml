@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>towercab</Name>
+  <Repository>ghcr.io/clucraft/towercab:latest</Repository>
+  <Registry>https://github.com/clucraft/towercab/pkgs/container/towercab</Registry>
+  <Network>bridge</Network>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/clucraft/towercab/issues</Support>
+  <Project>https://github.com/clucraft/towercab</Project>
+  <Overview>Live aircraft around an airport in a 3D scene, like the view from the tower cab, in a browser. Traffic comes from public ADS-B services or your own receiver. Works with no tokens at all (Schematic mode); a free Cesium ion token adds photorealistic 3D tiles and terrain. Not for navigation or operational use.</Overview>
+  <Category>Tools:Utilities</Category>
+  <WebUI>http://[IP]:[PORT:8790]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/clucraft/towercab/main/unraid/towercab.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/clucraft/towercab/main/unraid/towercab.png</Icon>
+  <Config Name="Web interface" Target="8790" Default="8790" Mode="tcp" Description="Port for the web page and its WebSocket. Point your reverse proxy at this." Type="Port" Display="always" Required="true" Mask="false">8790</Config>
+  <Config Name="Config" Target="/config" Default="/mnt/user/appdata/towercab/config" Mode="rw" Description="Holds config.yaml (airports, data sources, cameras). The example config is copied here on first start; edits are picked up while the container runs." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/towercab/config</Config>
+  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/towercab/data" Mode="rw" Description="Downloaded airport data, the camera queue, and your own aircraft models and recordings." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/towercab/data</Config>
+  <Config Name="Cesium ion token" Target="CESIUM_ION_TOKEN" Default="" Mode="" Description="Optional. A free Cesium ion access token switches on photorealistic 3D tiles and terrain. It is sent to browsers by design: restrict it to your hostname in the ion dashboard (Access Tokens, Allowed URLs)." Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="Public URL" Target="PUBLIC_URL" Default="" Mode="" Description="Optional. The address people use to reach TowerCab through your reverse proxy, e.g. https://towercab.example.com" Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="Time zone" Target="TZ" Default="UTC" Mode="" Description="Time zone for log times, e.g. America/Indiana/Indianapolis" Type="Variable" Display="always" Required="false" Mask="false">UTC</Config>
+  <Config Name="Admin token" Target="ADMIN_TOKEN" Default="" Mode="" Description="Optional. A long random string that switches on the /admin page (camera queue, discovery, camera poses). Leave empty and the admin page does not exist." Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="Google Maps API key" Target="GOOGLE_MAPS_API_KEY" Default="" Mode="" Description="Optional alternative to the ion token for photorealistic 3D tiles: a Google Maps Platform key with the Map Tiles API enabled. Sent to browsers by design: restrict it to your website in the Google Cloud console." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="adsb.lol API key" Target="ADSBLOL_API_KEY" Default="" Mode="" Description="Optional. Without a key adsb.lol allows 500 requests a day, which TowerCab paces itself to stay inside." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="OpenSky client id" Target="OPENSKY_CLIENT_ID" Default="" Mode="" Description="Optional. OpenSky Network API client id, for the fallback source (enable opensky in config.yaml)." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="OpenSky client secret" Target="OPENSKY_CLIENT_SECRET" Default="" Mode="" Description="Optional. OpenSky Network API client secret." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="YouTube API key" Target="YOUTUBE_API_KEY" Default="" Mode="" Description="Optional. YouTube Data API v3 key, used only when you search for cameras on the admin page." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Windy API key" Target="WINDY_API_KEY" Default="" Mode="" Description="Optional. Windy Webcams API key, for searching webcams on the admin page and showing them." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Log level" Target="LOG_LEVEL" Default="info|debug|warn|error" Mode="" Description="How much the container logs." Type="Variable" Display="advanced" Required="false" Mask="false">info</Config>
+  <Config Name="Port inside the container" Target="PORT" Default="8790" Mode="" Description="The port the server listens on inside the container. Leave it at 8790 unless you run the container on the host network; the port mapping above must point at the same number." Type="Variable" Display="advanced" Required="false" Mask="false">8790</Config>
+</Container>

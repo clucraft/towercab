@@ -455,9 +455,9 @@ export class SceneController {
     this.cones.setActive(id);
   }
 
+  /** Shows the cameras' view cones, not only their markers. For while cameras are on show. */
   setConesVisible(visible: boolean): void {
-    this.cones.show = visible;
-    this.viewer.scene.requestRender();
+    this.cones.cones = visible;
   }
 
   /** The camera the 3D view is looking through, if any. */

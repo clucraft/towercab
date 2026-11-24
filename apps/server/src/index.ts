@@ -4,7 +4,7 @@ import { buildApp } from './app';
 import { readEnv } from './config/env';
 import { ConfigStore } from './config/loader';
 import { createServices } from './services';
-import { findUp } from './util/paths';
+import { findUp, writableDataDir } from './util/paths';
 
 async function main(): Promise<void> {
   const env = readEnv();
@@ -15,6 +15,8 @@ async function main(): Promise<void> {
     // Tokens travel in config and request headers; make sure none of them can reach a log line.
     redact: ['secrets', '*.secrets', 'req.headers.authorization', 'req.headers["x-admin-token"]'],
   });
+
+  env.dataDir = await writableDataDir(env.dataDir, logger);
 
   const config = await ConfigStore.open({
     configDir: env.configDir,

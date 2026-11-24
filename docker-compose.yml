@@ -48,6 +48,55 @@ services:
       - "8555:8555/tcp"
       - "8555:8555/udp"
 
+  # Optional: your own ADS-B receiver. One RTL-SDR dongle on 1090 MHz, and for US general aviation a
+  # second one on 978 MHz (UAT). See docs/RECEIVER.md.
+  #   cp docker/receiver.env.example receiver.env    (then fill in your position and dongle serials)
+  #   docker compose --env-file .env --env-file receiver.env --profile receiver up -d
+  # With a single dongle, start only the first service:
+  #   docker compose --env-file .env --env-file receiver.env --profile receiver up -d ultrafeeder
+  # and in TowerCab's config.yaml:  providers: { readsb: { enabled: true } }
+  ultrafeeder:
+    # The project publishes a rolling `latest`; see DECISIONS D-059.
+    image: ghcr.io/sdr-enthusiasts/docker-adsb-ultrafeeder:latest
+    container_name: ultrafeeder
+    hostname: ultrafeeder
+    profiles: ["receiver"]
+    restart: unless-stopped
+    device_cgroup_rules:
+      - "c 189:* rwm" # USB devices
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb:rw
+    ports:
+      - "${ULTRAFEEDER_PORT:-8080}:80" # its own map (tar1090), handy for checking reception
+    environment:
+      - TZ=${TZ:-UTC}
+      - READSB_DEVICE_TYPE=rtlsdr
+      - READSB_RTLSDR_DEVICE=${ADSB_SDR_SERIAL:-}
+      - READSB_GAIN=${ADSB_SDR_GAIN:-auto}
+      - READSB_LAT=${FEEDER_LAT:-}
+      - READSB_LON=${FEEDER_LONG:-}
+      - READSB_ALT=${FEEDER_ALT_M:-0}m
+      # Where it takes data from besides its own dongle. With dump978: adsb,dump978,30978,uat_in
+      - ULTRAFEEDER_CONFIG=${ULTRAFEEDER_CONFIG:-}
+
+  dump978:
+    image: ghcr.io/sdr-enthusiasts/docker-dump978:latest
+    container_name: dump978
+    hostname: dump978
+    profiles: ["receiver"]
+    restart: unless-stopped
+    device_cgroup_rules:
+      - "c 188:* rwm"
+      - "c 189:* rwm"
+    volumes:
+      - /dev:/dev:ro
+    environment:
+      - TZ=${TZ:-UTC}
+      - LAT=${FEEDER_LAT:-}
+      - LON=${FEEDER_LONG:-}
+      - DUMP978_RTLSDR_DEVICE=${UAT_SDR_SERIAL:-}
+      - DUMP978_SDR_GAIN=${UAT_SDR_GAIN:-autogain}
+
 volumes:
   towercab-config:
   towercab-data:

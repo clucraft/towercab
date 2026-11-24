@@ -68,7 +68,7 @@ towercab/
       ui/                      React components
       pages/                   AirportPage, DebugPage, AdminPage
       ws/                      WebSocket client
-    public/models/             generated low-poly GLBs + ATTRIBUTION.md
+    public/models/             generated low-poly GLBs (credits in /ATTRIBUTION.md)
     e2e/                       Playwright smoke test
   packages/shared/
     src/                       schemas, messages, geo, altitude, type table lookup
@@ -136,10 +136,22 @@ towercab/
 
 ### Phase 5: Ship
 
-- [ ] Unraid template, GHCR release workflow, Dependabot, gitleaks
-- [ ] README with real screenshots (Playwright)
-- [ ] `docs/RECEIVER.md`, `docs/ADDING_AN_AIRPORT.md`, `ATTRIBUTION.md`
-- [ ] Tag `v0.1.0`
+- [x] Unraid template, GHCR release workflow, Dependabot, gitleaks
+- [x] Compose profile `receiver` (ultrafeeder, dump978)
+- [x] README with real screenshots (Playwright, `pnpm screenshots`)
+- [x] `docs/RECEIVER.md`, `docs/ADDING_AN_AIRPORT.md`, `ATTRIBUTION.md`
+- [x] Tag `v0.1.0`
+
+### Not verified, for want of hardware, accounts or keys
+
+Each is recorded in DECISIONS.md with what was checked instead.
+
+- [ ] The Unraid template on an Unraid server, and behind Zoraxy (D-061)
+- [ ] A local receiver with real hardware; the `receiver` compose profile (D-065)
+- [ ] YouTube and Windy discovery against real search results (D-052)
+- [ ] airplanes.live and OpenSky with credentials (D-011, D-016)
+- [ ] Frame rate on integrated graphics (D-038)
+- [ ] A `kind-busy` recording, and taxiway alignment at KIND with taxiing traffic (D-041, D-047)
 
 ## Per-phase gate
 

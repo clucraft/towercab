@@ -491,7 +491,12 @@ function PoseEditor(props: {
           airport,
           config,
           store,
-          mode: config.features.photoreal ? 'photoreal' : 'schematic',
+          // `?mode=schematic` works here as it does on an airport page.
+          mode:
+            config.features.photoreal &&
+            new URLSearchParams(window.location.search).get('mode') !== 'schematic'
+              ? 'photoreal'
+              : 'schematic',
           view: 'overhead',
           callbacks: { onNotice: (text) => !cancelled && setProblem(text) },
         }),
@@ -534,6 +539,7 @@ function PoseEditor(props: {
       ];
     });
     scene.setCameras(list);
+    scene.setConesVisible(true);
     scene.setActiveCamera(editing?.id ?? null);
     if (looking && editing) scene.matchCamera(editing.id, { animate: false });
     scene.editPose(draft && !looking ? { pose: draft, onChange: (pose) => onDraft.current(pose) } : null);
@@ -604,11 +610,10 @@ function PoseEditor(props: {
               >
                 Save pose
               </button>
-              {camera.pose && (
+              {/* Only a pose saved on this page can be taken away here. */}
+              {camera.poseFrom === 'admin' && (
                 <button type="button" disabled={props.busy} onClick={props.onRemove}>
-                  {camera.poseFrom === 'admin' && camera.origin === 'config'
-                    ? 'Back to config.yaml'
-                    : 'Remove pose'}
+                  {camera.origin === 'config' ? 'Back to config.yaml' : 'Remove pose'}
                 </button>
               )}
               <button

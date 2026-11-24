@@ -13,6 +13,8 @@ coverage/
 /data/
 # go2rtc.yaml for the `cameras` compose profile: it holds your cameras' addresses and passwords.
 /go2rtc/
+# Settings for the `receiver` compose profile: they say where your antenna is.
+/receiver.env
 .local/
 /config/config.yaml
 /config/*.local.yaml
