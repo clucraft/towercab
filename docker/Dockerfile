@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- base: Node 24 LTS + pnpm --------------------------------------------------
-FROM node:24-alpine AS base
+FROM node:26-alpine AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN npm install --global pnpm@10.28.1
@@ -26,7 +26,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm --filter @towercab/server deploy --prod --legacy /out
 
 # ---- runtime ---------------------------------------------------------------------
-FROM node:24-alpine AS runtime
+FROM node:26-alpine AS runtime
 ARG VERSION=dev
 ENV NODE_ENV=production \
     PORT=8790 \
