@@ -3,6 +3,7 @@ import pino from 'pino';
 import { buildApp } from './app';
 import { readEnv } from './config/env';
 import { ConfigStore } from './config/loader';
+import { createServices } from './services';
 import { findUp } from './util/paths';
 
 async function main(): Promise<void> {
@@ -11,6 +12,8 @@ async function main(): Promise<void> {
     level: env.logLevel,
     // JSON in production; readable lines on a developer terminal.
     transport: env.production ? undefined : { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss' } },
+    // Tokens travel in config and request headers; make sure none of them can reach a log line.
+    redact: ['secrets', '*.secrets', 'req.headers.authorization', 'req.headers["x-admin-token"]'],
   });
 
   const config = await ConfigStore.open({
@@ -21,7 +24,8 @@ async function main(): Promise<void> {
   });
   config.watch();
 
-  const app = await buildApp({ env, config, logger });
+  const services = await createServices({ env, logger, config });
+  const app = await buildApp(services);
 
   let closing = false;
   const shutdown = async (signal: string) => {
@@ -40,7 +44,16 @@ async function main(): Promise<void> {
 
   await app.listen({ host: '0.0.0.0', port: env.port });
   logger.info(
-    { version: env.version, airports: config.current.airports.map((a) => a.icao), configFile: config.file },
+    {
+      version: env.version,
+      airports: services.airports.list().map((a) => `${a.icao}${a.available ? '' : ' (no data)'}`),
+      sources: services.providers
+        .list()
+        .filter((p) => p.enabled)
+        .map((p) => p.id),
+      configFile: config.file,
+      dataDir: env.dataDir,
+    },
     'TowerCab is up',
   );
 }

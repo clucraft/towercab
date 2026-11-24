@@ -1,0 +1,12 @@
+{"ac":[
+{"hex":"a1be79","type":"adsb_icao","flight":"AAY9295 ","r":"N211NV","t":"A320","desc":"AIRBUS A-320","ownOp":"SUNRISE ASSET MANAGEMENT LLC","year":"2013","alt_baro":1525,"alt_geom":1900,"gs":170.4,"track":45.24,"baro_rate":192,"squawk":"4220","emergency":"none","category":"A3","nav_qnh":1032.8,"nav_altitude_mcp":2112,"lat":39.658813,"lon":-86.382931,"nic":8,"rc":186,"seen_pos":0.098,"version":2,"nic_baro":1,"nac_p":9,"nac_v":1,"sil":3,"sil_type":"perhour","gva":2,"sda":2,"alert":0,"spi":0,"mlat":[],"tisb":[],"messages":22843,"seen":0.1,"rssi":-12.6,"dst":5.387,"dir":229.4},
+{"hex":"acd38f","type":"adsb_icao","flight":"N9253S  ","r":"N9253S","t":"BE23","desc":"BEECH 23 Sundowner","ownOp":"KNUTH CHARLES ALLEN","year":"1975","alt_baro":600,"alt_geom":1050,"gs":64.9,"track":24.59,"geom_rate":-960,"squawk":"1200","emergency":"none","category":"A1","lat":39.818756,"lon":-86.301787,"nic":10,"rc":25,"seen_pos":0.066,"version":2,"nic_baro":0,"nac_p":10,"nac_v":1,"sil":3,"sil_type":"perhour","gva":2,"sda":2,"alert":0,"spi":0,"mlat":[],"tisb":[],"messages":22345,"seen":0.1,"rssi":-28.9,"dst":6.108,"dir":356.8},
+{"hex":"a186e8","type":"adsb_icao","flight":"N198LL  ","r":"N198LL","t":"BK17","desc":"EUROCOPTER BK117 C-1/2","ownOp":"METRO AVIATION INC","year":"2008","alt_baro":1475,"alt_geom":1850,"gs":123.7,"track":247.17,"baro_rate":192,"squawk":"0353","emergency":"none","category":"A7","nav_qnh":1032.8,"lat":39.779114,"lon":-86.298861,"nic":9,"rc":75,"seen_pos":0.266,"version":2,"nic_baro":1,"nac_p":10,"nac_v":2,"sil":3,"sil_type":"perhour","gva":2,"sda":2,"alert":0,"spi":0,"mlat":[],"tisb":[],"messages":2118,"seen":0.2,"rssi":-21.3,"dst":3.721,"dir":356.8},
+{"hex":"a2796f","type":"adsb_icao","flight":"FDX3605 ","r":"N259FE","t":"B763","desc":"BOEING 767-300","ownOp":"FEDERAL EXPRESS CORP","year":"2024","alt_baro":"ground","gs":0.0,"squawk":"1200","emergency":"none","category":"A5","lat":39.709617,"lon":-86.289215,"nic":8,"rc":186,"seen_pos":8.801,"version":2,"nac_p":10,"nac_v":2,"sil":3,"sil_type":"perhour","sda":2,"alert":0,"spi":0,"mlat":[],"tisb":[],"messages":378742,"seen":0.3,"rssi":-31.0,"dst":0.520,"dir":152.6}
+]
+,"msg": "No error"
+,"now": 1795544190001
+,"total": 4
+,"ctime": 1795544190001
+,"ptime": 0
+}

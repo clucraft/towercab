@@ -13,7 +13,10 @@ describe('example config', () => {
     expect(exampleFile).not.toBeNull();
     const config = parseConfig(await readFile(exampleFile as string, 'utf8'));
     expect(config.airports.map((a) => a.icao)).toEqual(['KLAF', 'KIND']);
-    expect(config.providers.adsblol).toMatchObject({ enabled: true, priority: 1 });
+    expect(config.providers.adsbfi).toMatchObject({ enabled: true, priority: 1 });
+    expect(config.providers.adsblol).toMatchObject({ enabled: true, priority: 2 });
+    expect(config.providers.airplaneslive.enabled).toBe(false);
+    expect(config.client.renderDelayMs).toBe(2500);
     expect(config.providers.readsb.enabled).toBe(false);
     expect(config.providers.opensky.enabled).toBe(false);
     expect(config.polling.activeIntervalMs).toBe(2000);
@@ -31,7 +34,8 @@ describe('parseConfig', () => {
       pauseWhenNoViewersAfterMs: 300_000,
       secondaryEveryN: 3,
     });
-    expect(config.providers.airplaneslive.priority).toBe(2);
+    expect(config.providers.airplaneslive).toMatchObject({ enabled: false, priority: 3 });
+    expect(config.providers.adsbfi.priority).toBe(1);
     expect(config.proxy.allowlist).toEqual([]);
   });
 

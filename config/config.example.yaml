@@ -18,13 +18,21 @@ airports:
     defaultView: overhead
 
 # ADS-B sources. Lower priority number = preferred. Any combination can be enabled.
+# Limits were checked against each service in November 2026; see docs/DECISIONS.md.
 providers:
   # Your own receiver (tar1090 / ultrafeeder). The only reliable way to see ramp traffic.
+  # Add `stream: { host: ultrafeeder, port: 30047 }` to read readsb's JSON position stream instead of polling.
   readsb: { enabled: false, url: "http://ultrafeeder/data/aircraft.json", priority: 0 }
-  adsblol: { enabled: true, priority: 1 } # ODbL, attribution required
-  airplaneslive: { enabled: true, priority: 2 } # non-commercial use only
-  adsbfi: { enabled: true, priority: 3 } # personal, non-commercial use only
-  # Fallback only, used when every other source is failing. Needs OPENSKY_CLIENT_ID / _SECRET.
+  # 1 request per second, no key. Personal, non-commercial use; attribution and a link are required.
+  adsbfi: { enabled: true, priority: 1 }
+  # 500 requests per day without a key (ODbL). TowerCab paces itself to stay inside that.
+  # A free key raises the limit: set ADSBLOL_API_KEY. See https://www.adsb.lol/docs/open-data/api/
+  adsblol: { enabled: true, priority: 2 }
+  # Off by default: the API now answers 403 until you have asked contact@airplanes.live for access.
+  # If they give you a header to send, add `headers: { "Header-Name": "value" }` here.
+  airplaneslive: { enabled: false, priority: 3 }
+  # Fallback only, used when every other source is failing. Works anonymously (400 credits a day);
+  # OPENSKY_CLIENT_ID / OPENSKY_CLIENT_SECRET raise that to 4,000.
   opensky: { enabled: false, priority: 9 }
 
 polling:
@@ -45,3 +53,14 @@ proxy:
 discovery:
   enabled: false
   intervalHours: 6
+
+# Browsers draw the scene this far behind real time, so there is always a newer position to move towards.
+client:
+  renderDelayMs: 2500
+
+# Aircraft photos from planespotters.net, shown when an aircraft is selected.
+photos:
+  enabled: true
+
+# Optional. Overpass API endpoint used for the airport layout (one query per airport per week).
+# overpassUrl: "https://overpass-api.de/api/interpreter"

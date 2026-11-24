@@ -3,15 +3,20 @@ import { z } from 'zod';
 
 const priority = z.number().int().min(0).max(99);
 
-/** A public aggregator API. `baseUrl` exists so a self-hosted mirror can be used; the default is built in. */
+/** A public aggregator API. The URL, rate limit and quota are built in; config can only tighten them. */
 function publicProvider(defaultPriority: number, defaultEnabled: boolean) {
   return z
     .object({
       enabled: z.boolean().default(defaultEnabled),
       priority: priority.default(defaultPriority),
+      /** Use a different base URL, for a self-hosted mirror. */
       baseUrl: z.url().optional(),
       /** Minimum gap between requests to this provider across all airports. Raises, never lowers, the built-in limit. */
       minIntervalMs: z.number().int().min(250).optional(),
+      /** Requests per day to budget for, when your key or agreement differs from the built-in assumption. */
+      dailyQuota: z.number().int().positive().optional(),
+      /** Extra request headers, for services that grant access through a header of their own. */
+      headers: z.record(z.string(), z.string()).optional(),
     })
     .prefault({});
 }
@@ -33,9 +38,10 @@ export const ProvidersSchema = z
           .optional(),
       })
       .prefault({}),
-    adsblol: publicProvider(1, true),
-    airplaneslive: publicProvider(2, true),
-    adsbfi: publicProvider(3, true),
+    // Order and defaults follow what the live services allow; see docs/DECISIONS.md D-010 to D-012.
+    adsbfi: publicProvider(1, true),
+    adsblol: publicProvider(2, true),
+    airplaneslive: publicProvider(3, false),
     opensky: z
       .object({
         enabled: z.boolean().default(false),
@@ -55,7 +61,7 @@ export const PollingSchema = z
     idleIntervalMs: z.number().int().min(5000).default(60_000),
     /** How long to keep idling before polling stops completely. */
     pauseWhenNoViewersAfterMs: z.number().int().min(0).default(300_000),
-    /** The highest-priority public source is polled every cycle; the others every Nth cycle. */
+    /** The preferred public source is polled every cycle; the others every Nth cycle. */
     secondaryEveryN: z.number().int().min(1).max(60).default(3),
   })
   .prefault({});
@@ -66,6 +72,7 @@ export const SecretsSchema = z
   .object({
     cesiumIonToken: z.string().optional(),
     googleMapsApiKey: z.string().optional(),
+    adsblolApiKey: z.string().optional(),
     openskyClientId: z.string().optional(),
     openskyClientSecret: z.string().optional(),
     youtubeApiKey: z.string().optional(),
@@ -94,6 +101,25 @@ export const ConfigFileSchema = z
         intervalHours: z.number().min(6).default(6),
       })
       .prefault({}),
+    client: z
+      .object({
+        /** How far behind real time browsers render, so there is always a newer position to move towards. */
+        renderDelayMs: z.number().int().min(0).max(15_000).default(2500),
+      })
+      .prefault({}),
+    photos: z
+      .object({
+        /** Look up an aircraft photo on planespotters.net when an aircraft is selected. */
+        enabled: z.boolean().default(true),
+      })
+      .prefault({}),
+    /** Overpass API endpoint for the airport layout. Point this at your own instance for heavy use. */
+    overpassUrl: z.url().optional(),
+    /**
+     * `User-Agent` sent to every upstream service. Several of them refuse generic agents, so it has to
+     * identify the application and give a contact URL. Defaults to the project's own.
+     */
+    userAgent: z.string().min(8).optional(),
     secrets: SecretsSchema,
   })
   .superRefine((cfg, ctx) => {

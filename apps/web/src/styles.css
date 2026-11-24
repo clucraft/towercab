@@ -2,11 +2,24 @@
   color-scheme: dark;
   --bg: #0b0f14;
   --panel: #121922;
+  --panel-2: #18212c;
   --line: #223041;
   --text: #e6edf3;
   --muted: #8b9bb0;
   --accent: #3fd0ff;
-  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --ok: #4ade80;
+  --warn: #fbbf24;
+  --bad: #f87171;
+  /* One colour per flight phase, shared by the table, the labels and the trails. */
+  --phase-parked: #8b9bb0;
+  --phase-taxiing: #fbbf24;
+  --phase-takeoff_roll: #fb923c;
+  --phase-departing: #4ade80;
+  --phase-arriving: #60a5fa;
+  --phase-landing_roll: #c084fc;
+  --phase-pattern: #2dd4bf;
+  --phase-transit: #e6edf3;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
   font-size: 14px;
 }
 
@@ -26,17 +39,53 @@ body {
   color: var(--text);
 }
 
+h1,
+h2 {
+  margin: 0;
+  font-weight: 600;
+}
+
+h2 {
+  margin: 1.5rem 0 0.5rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.mono {
+  font-family: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+}
+
+button.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+button.link:hover {
+  text-decoration: underline;
+}
+
+/* ---- landing page ---- */
+
 .placeholder {
   display: grid;
   place-content: center;
   gap: 0.5rem;
-  height: 100%;
+  min-height: 100%;
   padding: 2rem;
   text-align: center;
 }
 
 .placeholder h1 {
-  margin: 0;
   letter-spacing: 0.08em;
   color: var(--accent);
 }
@@ -45,4 +94,190 @@ body {
   margin-top: 2rem;
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+.airport-list {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.airport-card {
+  display: grid;
+  grid-template-columns: 4rem 1fr auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  text-align: left;
+}
+
+.airport-card strong {
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+.airport-links {
+  display: flex;
+  gap: 1rem;
+}
+
+/* ---- live data table ---- */
+
+.debug {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem 3rem;
+}
+
+.debug-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.debug-header h1 {
+  font-size: 1.4rem;
+  color: var(--accent);
+}
+
+.debug-header h1 .muted {
+  font-size: 1rem;
+  font-weight: 400;
+}
+
+.debug-header p {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+}
+
+.debug-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pill {
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  font-size: 0.8rem;
+}
+
+.pill-open {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+.pill-connecting,
+.pill-reconnecting {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.pill-closed {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+}
+
+table.data th,
+table.data td {
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+table.data th {
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+table.data tr:last-child td {
+  border-bottom: 0;
+}
+
+table.data .num {
+  text-align: right;
+}
+
+table.data td.muted {
+  white-space: normal;
+}
+
+.state {
+  font-weight: 600;
+}
+
+.state-ok {
+  color: var(--ok);
+}
+
+.state-idle,
+.state-degraded,
+.state-backoff {
+  color: var(--warn);
+}
+
+.state-blocked,
+.state-disabled {
+  color: var(--bad);
+}
+
+.phase {
+  font-weight: 600;
+}
+
+.phase-parked {
+  color: var(--phase-parked);
+}
+.phase-taxiing {
+  color: var(--phase-taxiing);
+}
+.phase-takeoff_roll {
+  color: var(--phase-takeoff_roll);
+}
+.phase-departing {
+  color: var(--phase-departing);
+}
+.phase-arriving {
+  color: var(--phase-arriving);
+}
+.phase-landing_roll {
+  color: var(--phase-landing_roll);
+}
+.phase-pattern {
+  color: var(--phase-pattern);
+}
+.phase-transit {
+  color: var(--phase-transit);
+}
+
+.debug > footer {
+  margin-top: 2rem;
+  font-size: 0.85rem;
+}
+
+.debug section {
+  overflow-x: auto;
 }

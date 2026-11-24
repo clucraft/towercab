@@ -95,15 +95,15 @@ towercab/
 
 ### Phase 1: Live data
 
-- [ ] Verify each API live; save trimmed fixtures
-- [ ] readsb/v2 parser + adsb.lol, airplanes.live, adsb.fi adapters
-- [ ] Local readsb adapter (HTTP, optional TCP 30047), OpenSky adapter (OAuth2, fallback only)
-- [ ] Token bucket, backoff with retry-after, viewer-driven scheduler
-- [ ] Merge, TIS-B dedupe, geofence, classification, 10 min history
-- [ ] OurAirports loader, EGM96 geoid, METAR
-- [ ] WebSocket protocol + hub, REST endpoints
-- [ ] `/debug/:icao` live table
-- [ ] `scripts/soak.ts`
+- [x] Verify each API live; save trimmed fixtures
+- [x] readsb/v2 parser + adsb.lol, airplanes.live, adsb.fi adapters
+- [x] Local readsb adapter (HTTP, optional TCP 30047), OpenSky adapter (OAuth2, fallback only)
+- [x] Token bucket, backoff with retry-after, viewer-driven scheduler
+- [x] Merge, TIS-B dedupe, geofence, classification, 10 min history
+- [x] OurAirports loader, EGM96 geoid, METAR
+- [x] WebSocket protocol + hub, REST endpoints
+- [x] `/debug/:icao` live table
+- [x] `scripts/soak.ts`
 - [ ] Done when: live aircraft at both airports, provider health visible, 30 min soak with no 429, polling stops with no viewers
 
 ### Phase 2: 3D scene

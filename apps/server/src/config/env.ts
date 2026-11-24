@@ -21,6 +21,7 @@ const EnvSchema = z.object({
   TOWERCAB_VERSION: z.preprocess(blankToUndefined, z.string().default('dev')),
   CESIUM_ION_TOKEN: optionalString,
   GOOGLE_MAPS_API_KEY: optionalString,
+  ADSBLOL_API_KEY: optionalString,
   OPENSKY_CLIENT_ID: optionalString,
   OPENSKY_CLIENT_SECRET: optionalString,
   YOUTUBE_API_KEY: optionalString,
@@ -59,6 +60,7 @@ export function readEnv(source: NodeJS.ProcessEnv = process.env): Env {
   const secrets: Secrets = {
     cesiumIonToken: e.CESIUM_ION_TOKEN,
     googleMapsApiKey: e.GOOGLE_MAPS_API_KEY,
+    adsblolApiKey: e.ADSBLOL_API_KEY,
     openskyClientId: e.OPENSKY_CLIENT_ID,
     openskyClientSecret: e.OPENSKY_CLIENT_SECRET,
     youtubeApiKey: e.YOUTUBE_API_KEY,

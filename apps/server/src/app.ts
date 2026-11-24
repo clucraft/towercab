@@ -1,22 +1,16 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import fastifyStatic from '@fastify/static';
-import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } from 'fastify';
-import type { Env } from './config/env';
-import type { ConfigStore } from './config/loader';
+import Fastify, { type FastifyInstance, LogController } from 'fastify';
+import { registerApiRoutes } from './routes/api';
+import type { Services } from './services';
 import { findUp } from './util/paths';
-
-export interface AppDeps {
-  env: Env;
-  config: ConfigStore;
-  logger: FastifyBaseLogger;
-}
 
 /** Paths that belong to the API surface and must never fall through to the single-page app. */
 const NON_SPA_PREFIXES = ['/api/', '/ws', '/healthz', '/metrics', '/cesium/', '/models/', '/assets/'];
 
-export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
-  const { env, config, logger } = deps;
+export async function buildApp(services: Services): Promise<FastifyInstance> {
+  const { env, config, logger } = services;
   const startedAt = Date.now();
 
   const app = Fastify({
@@ -34,13 +28,17 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     airports: config.current.airports.map((a) => a.icao),
   }));
 
+  registerApiRoutes(app, services);
+  services.hub.attach(app.server);
+  app.addHook('onClose', async () => services.close());
+
   const webDist = env.webDist ?? findUp(join('apps', 'web', 'dist'));
   if (webDist && existsSync(join(webDist, 'index.html'))) {
     await app.register(fastifyStatic, {
       root: webDist,
       wildcard: false,
-      // Vite fingerprints everything under /assets, so those files can be cached forever.
       setHeaders(reply, path) {
+        // Vite fingerprints everything under /assets, so those files can be cached forever.
         if (path.startsWith(join(webDist, 'assets'))) {
           reply.header('Cache-Control', 'public, max-age=31536000, immutable');
         } else if (path.endsWith('index.html')) {
