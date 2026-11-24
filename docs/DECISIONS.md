@@ -571,3 +571,23 @@ compose profile has been run. docs/RECEIVER.md says this at the top.
 
 Found while taking the screenshots: when several browsers opened an airport in the same moment, the first
 request fetched the METAR and the others were told there was none. They now wait for the same fetch.
+
+### D-067 Deployed on Unraid 7.2.0; what that confirmed (Verified)
+
+First deployment, on an Unraid 7.2.0 server over SSH. Read from that server's own Docker manager
+(`/usr/local/emhttp/plugins/dynamix.docker.manager/include`):
+
+- user templates live in `/boot/config/plugins/dockerMan/templates-user` (`DockerClient.php`), named
+  `my-<name>.xml`. This settles the open point in D-061;
+- for a path that does not exist yet, the Docker manager makes the folder and gives it to user 99, group 100
+  (`Helpers.php`: `mkdir`, `chown 99`, `chgrp 100`). Folders made that way on the server were mode 0755, so
+  the image's default user (1000) could not have written to them. The template therefore sets
+  `--user 99:100` under Extra Parameters; the image runs as any user (checked: config copied, database
+  created, no warnings);
+- every container it creates gets `--pids-limit 2048`, the variables `TZ`, `HOST_OS`, `HOST_HOSTNAME`,
+  `HOST_CONTAINERNAME`, and the labels `net.unraid.docker.managed`, `.webui` and `.icon`.
+
+The container was created with those same parameters and the template's values, and the template was placed
+in the templates folder. Afterwards the Docker manager's own lookup returned that template for the container,
+the health check passed, and a browser on another machine showed live traffic at KIND in Photoreal at 60 fps.
+Not done: creating the container by clicking through Add Container in the web UI, and the reverse proxy.

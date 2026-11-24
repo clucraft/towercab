@@ -12,6 +12,7 @@
   <WebUI>http://[IP]:[PORT:8790]/</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/clucraft/towercab/main/unraid/towercab.xml</TemplateURL>
   <Icon>https://raw.githubusercontent.com/clucraft/towercab/main/unraid/towercab.png</Icon>
+  <ExtraParams>--user 99:100</ExtraParams>
   <Config Name="Web interface" Target="8790" Default="8790" Mode="tcp" Description="Port for the web page and its WebSocket. Point your reverse proxy at this." Type="Port" Display="always" Required="true" Mask="false">8790</Config>
   <Config Name="Config" Target="/config" Default="/mnt/user/appdata/towercab/config" Mode="rw" Description="Holds config.yaml (airports, data sources, cameras). The example config is copied here on first start; edits are picked up while the container runs." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/towercab/config</Config>
   <Config Name="Data" Target="/data" Default="/mnt/user/appdata/towercab/data" Mode="rw" Description="Downloaded airport data, the camera queue, and your own aircraft models and recordings." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/towercab/data</Config>

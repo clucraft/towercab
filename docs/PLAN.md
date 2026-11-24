@@ -146,7 +146,8 @@ towercab/
 
 Each is recorded in DECISIONS.md with what was checked instead.
 
-- [ ] The Unraid template on an Unraid server, and behind Zoraxy (D-061)
+- [ ] The Unraid template through the web UI's Add Container form (the rest was checked on Unraid 7.2.0,
+      D-067), and Zoraxy (D-061)
 - [ ] A local receiver with real hardware; the `receiver` compose profile (D-065)
 - [ ] YouTube and Windy discovery against real search results (D-052)
 - [ ] airplanes.live and OpenSky with credentials (D-011, D-016)

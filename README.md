@@ -53,14 +53,17 @@ docker compose up -d     # add --build to build the image from source
 [unraid/towercab.xml](unraid/towercab.xml) is a container template: the port, the two appdata folders
 (`/mnt/user/appdata/towercab/config` and `.../data`) and every setting, with the secret ones masked.
 
-It is not in Community Applications. Either add a container by hand with the values from the template, or
-put the file among your user templates so that it shows up in the template list of **Add Container**. The
-Unraid forum's Docker FAQ gives the folder for user templates as `config/plugins/dockerMan/templates-user` on
-the flash drive; that could not be confirmed from Unraid's own documentation, and the template has not been
-tried on an Unraid server. Please open an issue if a field needs changing.
+It is not in Community Applications. Copy the file to the flash drive as
+`/boot/config/plugins/dockerMan/templates-user/my-towercab.xml`; it then appears under **Add Container** in the
+template list, where you fill in the token and press Apply.
 
-If the appdata folders are not writable for the container, TowerCab still starts, with the built-in example
-config and a warning in the log that says which folder to fix.
+The template runs the container as Unraid's own user (`--user 99:100`, under Extra Parameters), because that
+is the owner Unraid gives the appdata folders it creates. If the folders are not writable all the same,
+TowerCab still starts, with the built-in example config and a warning in the log that says which folder to fix.
+
+Checked on Unraid 7.2.0: the template folder, the folder ownership, and a container created with exactly the
+template's settings, which Unraid's Docker manager then lists with this template. The Add Container form
+itself was not clicked through.
 
 ## Configuration
 

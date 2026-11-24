@@ -24,4 +24,4 @@ webrtc:
   # In a container go2rtc cannot tell which address browsers reach it at, so say it here: this host's
   # address on your network, and the port published above. Without it video still plays, carried over
   # TowerCab's own connection, which costs a little latency.
-  # candidates: [ 192.168.1.55:8555 ]
+  # candidates: [ 192.168.1.20:8555 ]
