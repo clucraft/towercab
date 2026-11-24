@@ -1,0 +1,37 @@
+# dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.vite/
+
+# secrets and local runtime state
+.env
+.env.*
+!.env.example
+/data/
+.local/
+/config/config.yaml
+/config/*.local.yaml
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# generated at build time (see scripts/gen-models.ts); committed copies live in apps/web/public/models
+apps/web/public/cesium/
+
+# test and tooling output
+playwright-report/
+test-results/
+.playwright/
+soak-*.log
+*.log
+
+# editors and OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+.claude/

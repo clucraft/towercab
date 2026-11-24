@@ -1,0 +1,47 @@
+# TowerCab configuration.
+# Copied to /config/config.yaml on first start. Edits are picked up while the server runs;
+# an invalid edit is logged and ignored.
+
+airports:
+  # Only `icao` is required. Name, reference point, field elevation and runways are read from
+  # OurAirports, and any value written here overrides that data (lat, lon, elevationFt, name, city).
+  - icao: KLAF
+    radiusNm: 6 # geofence radius around the airport reference point
+    ceilingFtAgl: 5000 # hide traffic above this height over the field
+    tower: null # null = take the tower from OpenStreetMap when it is mapped there.
+      # To set it yourself: { lat: .., lon: .., heightM: .., approximate: true }
+    defaultView: tower # tower | overhead | orbit | rwy-<designator>, e.g. rwy-10
+  - icao: KIND
+    radiusNm: 8
+    ceilingFtAgl: 6000
+    tower: null
+    defaultView: overhead
+
+# ADS-B sources. Lower priority number = preferred. Any combination can be enabled.
+providers:
+  # Your own receiver (tar1090 / ultrafeeder). The only reliable way to see ramp traffic.
+  readsb: { enabled: false, url: "http://ultrafeeder/data/aircraft.json", priority: 0 }
+  adsblol: { enabled: true, priority: 1 } # ODbL, attribution required
+  airplaneslive: { enabled: true, priority: 2 } # non-commercial use only
+  adsbfi: { enabled: true, priority: 3 } # personal, non-commercial use only
+  # Fallback only, used when every other source is failing. Needs OPENSKY_CLIENT_ID / _SECRET.
+  opensky: { enabled: false, priority: 9 }
+
+polling:
+  activeIntervalMs: 2000 # while at least one browser is watching an airport
+  idleIntervalMs: 60000 # after the last viewer leaves
+  pauseWhenNoViewersAfterMs: 300000 # then stop polling completely
+  secondaryEveryN: 3 # the preferred public source is polled every cycle, the rest every Nth
+
+# Live cameras. Ships empty on purpose: add only streams you have checked yourself.
+# See docs/ADDING_A_CAMERA.md for the fields.
+cameras: []
+
+# The server proxies camera streams only for hostnames listed here. Empty = proxy off.
+proxy:
+  allowlist: []
+
+# Camera discovery (admin only). Needs ADMIN_TOKEN plus YOUTUBE_API_KEY and/or WINDY_API_KEY.
+discovery:
+  enabled: false
+  intervalHours: 6

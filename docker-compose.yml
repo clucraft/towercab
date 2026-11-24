@@ -1,0 +1,33 @@
+# TowerCab core app. Start with: docker compose up -d
+# To build from source instead of pulling the image: docker compose up -d --build
+name: towercab
+
+services:
+  towercab:
+    image: ghcr.io/clucraft/towercab:latest
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: towercab
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8790}:${PORT:-8790}"
+    environment:
+      PORT: ${PORT:-8790}
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      TZ: ${TZ:-UTC}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      CESIUM_ION_TOKEN: ${CESIUM_ION_TOKEN:-}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      OPENSKY_CLIENT_ID: ${OPENSKY_CLIENT_ID:-}
+      OPENSKY_CLIENT_SECRET: ${OPENSKY_CLIENT_SECRET:-}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      WINDY_API_KEY: ${WINDY_API_KEY:-}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+    volumes:
+      - towercab-config:/config
+      - towercab-data:/data
+
+volumes:
+  towercab-config:
+  towercab-data:
