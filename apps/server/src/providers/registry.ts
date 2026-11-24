@@ -1,5 +1,10 @@
 import type { AppConfig } from '../config/schema';
-import { AGGREGATORS, type AggregatorId, createAggregatorSource } from './aggregators';
+import {
+  AGGREGATORS,
+  type AggregatorId,
+  createAggregatorSource,
+  effectiveMinIntervalMs,
+} from './aggregators';
 import type { FetchLike } from './http';
 import { ManagedProvider } from './managed';
 import { createOpenSkySource } from './opensky';
@@ -49,8 +54,7 @@ export function buildProviders(config: AppConfig, deps: RegistryDeps): ManagedPr
           enabled: cfg.enabled,
           priority: cfg.priority,
           limits: {
-            // Config can only slow a provider down, never push it past the published limit.
-            minIntervalMs: Math.max(def.minIntervalMs, cfg.minIntervalMs ?? 0),
+            minIntervalMs: effectiveMinIntervalMs(def, cfg.minIntervalMs),
             dailyQuota: cfg.dailyQuota ?? builtInQuota,
           },
           now: deps.now,

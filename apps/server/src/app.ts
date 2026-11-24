@@ -8,7 +8,16 @@ import type { Services } from './services';
 import { findUp } from './util/paths';
 
 /** Paths that belong to the API surface and must never fall through to the single-page app. */
-const NON_SPA_PREFIXES = ['/api/', '/ws', '/healthz', '/metrics', '/cesium/', '/models/', '/assets/'];
+const NON_SPA_PREFIXES = [
+  '/api/',
+  '/ws',
+  '/healthz',
+  '/metrics',
+  '/cesium/',
+  '/models/',
+  '/replays/',
+  '/assets/',
+];
 
 export async function buildApp(services: Services): Promise<FastifyInstance> {
   const { env, config, logger } = services;
@@ -52,10 +61,30 @@ export async function buildApp(services: Services): Promise<FastifyInstance> {
     return reply.code(404).send({ error: 'not_found', message: `No model named ${file}` });
   });
 
+  // Recordings for `?replay=name`: your own in /data/replays, then the ones that ship with the app.
+  const replayOverrides = join(env.dataDir, 'replays');
+  app.get<{ Params: { file: string } }>('/replays/:file', async (request, reply) => {
+    const { file } = request.params;
+    if (!/^[A-Za-z0-9-]+\.jsonl$/.test(file)) return reply.code(404).send({ error: 'not_found' });
+    for (const dir of [replayOverrides, webDist ? join(webDist, 'replays') : null]) {
+      if (!dir) continue;
+      try {
+        const body = await readFile(join(dir, file));
+        return reply.type('application/x-ndjson').header('Cache-Control', 'no-cache').send(body);
+      } catch {
+        // not in this directory
+      }
+    }
+    return reply.code(404).send({ error: 'not_found', message: `No recording named ${file}` });
+  });
+
   if (webDist && existsSync(join(webDist, 'index.html'))) {
     await app.register(fastifyStatic, {
       root: webDist,
       wildcard: false,
+      // Models and recordings are served by the routes above, so that a file in /data can replace a
+      // built-in one. A route per file here would win over them.
+      globIgnore: ['models/**', 'replays/**'],
       setHeaders(reply, path) {
         // Vite fingerprints everything under /assets, so those files can be cached forever.
         if (path.startsWith(join(webDist, 'assets'))) {

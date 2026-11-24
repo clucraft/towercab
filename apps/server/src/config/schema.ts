@@ -11,7 +11,10 @@ function publicProvider(defaultPriority: number, defaultEnabled: boolean) {
       priority: priority.default(defaultPriority),
       /** Use a different base URL, for a self-hosted mirror. */
       baseUrl: z.url().optional(),
-      /** Minimum gap between requests to this provider across all airports. Raises, never lowers, the built-in limit. */
+      /**
+       * Gap between requests to this provider across all airports. Can be raised freely; it can be lowered
+       * only as far as the provider's published limit (adsb.fi: 1.1 s) or safe floor (adsb.lol: 3 s).
+       */
       minIntervalMs: z.number().int().min(250).optional(),
       /** Requests per day to budget for, when your key or agreement differs from the built-in assumption. */
       dailyQuota: z.number().int().positive().optional(),

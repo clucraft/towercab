@@ -13,8 +13,10 @@ export interface AggregatorDefinition {
   baseUrl: string;
   /** Path for "aircraft within `nm` nautical miles of a point". */
   path(lat: string, lon: string, nm: number): string;
-  /** Shortest allowed gap between requests, from the service's published limit plus a margin. */
+  /** Gap between requests used by default: the service's published limit plus a margin. */
   minIntervalMs: number;
+  /** The shortest gap config may ask for. Defaults to `minIntervalMs`: the published limit cannot be undercut. */
+  floorMs?: number;
   /** Requests per day without a key, when the service has a daily quota. */
   dailyQuota?: number;
   /** Header that carries an API key, when the service has keys. */
@@ -27,7 +29,12 @@ export const AGGREGATORS = {
     label: 'adsb.lol',
     baseUrl: 'https://api.adsb.lol',
     path: (lat, lon, nm) => `/v2/lat/${lat}/lon/${lon}/dist/${nm}`,
-    minIntervalMs: 2000,
+    // Besides the daily quota there is a short-term limit that is neither published nor in the response
+    // headers. Seen on 2026-11-24: 429 after nine requests two seconds apart, and again after about 80
+    // requests in ten minutes at seven seconds apart, both with most of the daily quota left. Ten seconds
+    // is a cautious default, not a known-safe figure; the quota pacing spaces requests far wider anyway.
+    minIntervalMs: 10_000,
+    floorMs: 3000,
     // "No key: 500 requests/day per IP" (API docs and x-ratelimit-limit header).
     dailyQuota: 500,
     apiKeyHeader: 'x-api-key',
@@ -51,6 +58,15 @@ export const AGGREGATORS = {
 } as const satisfies Record<string, AggregatorDefinition>;
 
 export type AggregatorId = keyof typeof AGGREGATORS;
+
+/**
+ * The gap between requests to a public source: the built-in one, or the one from config. Config can slow a
+ * source down freely, and speed it up only as far as its floor: never past a published limit.
+ */
+export function effectiveMinIntervalMs(def: AggregatorDefinition, configured: number | undefined): number {
+  if (configured === undefined) return def.minIntervalMs;
+  return Math.max(def.floorMs ?? def.minIntervalMs, configured);
+}
 
 export interface AggregatorOptions {
   userAgent: string;

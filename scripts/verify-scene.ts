@@ -6,6 +6,7 @@
  *
  *   pnpm verify:scene                       # simulated traffic at KIND, both base maps
  *   pnpm verify:scene --live --airport KLAF # the motion check against live traffic
+ *   pnpm verify:scene --airport KLAF --replay klaf-pattern --seconds 200   # a recording, landing included
  *   pnpm verify:scene --url http://host:8790
  *
  * Exit code 0 when every check passes.
@@ -19,6 +20,7 @@ const { values } = parseArgs({
     airport: { type: 'string', default: 'KIND' },
     seconds: { type: 'string', default: '45' },
     live: { type: 'boolean', default: false },
+    replay: { type: 'string' },
     modes: { type: 'string', default: 'schematic,photoreal' },
   },
 });
@@ -179,8 +181,8 @@ async function watch(page: Page, seconds: number, simulated: boolean): Promise<F
               if (!before.onGround && a.onGround) landed.set(a.hex, now);
               step = { east, north };
             }
-            // On the ground according to the newest report as well: an aircraft lifting off is still "on the
-            // ground" for half an update while it is already climbing.
+            // On the ground as drawn and according to the newest report: the scene draws a little behind, so
+            // an aircraft that has just been reported airborne is still on its take-off roll on screen.
             // Simulated taxi routes are straight lines that know nothing of buildings, and in Photoreal
             // they run through terminals, where the surface is a roof. They are left out of this check;
             // parked aircraft, take-off and landing rolls and everything live is judged.
@@ -217,12 +219,18 @@ async function main(): Promise<number> {
     args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'],
   });
   let failed = false;
+  // Real traffic, live or recorded, is judged in full; the simulator's taxi routes are not (see `watch`).
+  const traffic = values.replay
+    ? { query: `replay=${values.replay}&`, label: `replay ${values.replay}`, simulated: false }
+    : values.live
+      ? { query: '', label: 'live', simulated: false }
+      : { query: 'sim=150&', label: '150 simulated', simulated: true };
 
   for (const mode of (values.modes as string).split(',')) {
     const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
     // tsx wraps named functions in a `__name` helper; the function sent to the page needs it to exist there.
     await page.addInitScript('window.__name = (fn) => fn;');
-    const query = values.live ? `mode=${mode}&view=orbit` : `sim=150&mode=${mode}&view=orbit`;
+    const query = `${traffic.query}mode=${mode}&view=orbit`;
     await page.goto(`${base}/${values.airport}?${query}`);
     await page.waitForFunction(
       () => (window as unknown as { __towercab?: unknown }).__towercab !== undefined,
@@ -233,7 +241,7 @@ async function main(): Promise<number> {
     );
     // Let the base map and the first surface heights load before judging anything.
     await page.waitForTimeout(12_000);
-    const log = await watch(page, seconds, !values.live);
+    const log = await watch(page, seconds, traffic.simulated);
     await page.close();
 
     const problems: string[] = [];
@@ -253,7 +261,7 @@ async function main(): Promise<number> {
       problems.push(`a landed aircraft was ${log.worstLandingGapM.toFixed(2)} m off the surface`);
 
     console.log(
-      `${values.airport} ${mode}${values.live ? ' (live)' : ' (150 simulated)'}: ${log.frames} frames in ${seconds} s, ${log.aircraft} aircraft, ` +
+      `${values.airport} ${mode} (${traffic.label}): ${log.frames} frames in ${seconds} s, ${log.aircraft} aircraft, ` +
         `largest step ${log.worstStepRatio.toFixed(2)} of the allowance, ` +
         `${log.groundSamples} ground checks (worst gap ${log.worstGroundGapM.toFixed(2)} m), ` +
         `${log.landings} landings (worst gap after touchdown ${log.worstLandingGapM.toFixed(2)} m)`,

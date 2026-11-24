@@ -117,11 +117,12 @@ towercab/
 
 ### Phase 3: Schematic mode and polish
 
-- [ ] Overpass loader + OSM→GeoJSON, schematic layers
-- [ ] Trails, phase colours
-- [ ] Aircraft list, METAR + active runway hint, source health panel, outbound links
-- [ ] Keyboard shortcuts, mobile landscape layout, attribution footer
-- [ ] Replay mode (`?replay=…`) + `scripts/record.ts`
+- [x] Overpass loader + OSM→GeoJSON, schematic layers
+- [x] Trails, phase colours
+- [x] Aircraft list, METAR + active runway hint, source health panel, outbound links
+- [x] Keyboard shortcuts, mobile landscape layout, attribution footer
+- [x] Replay mode (`?replay=…`) + `scripts/record.ts`
+- [x] Done when: the app is usable with no token at all, and a recording plays back
 
 ### Phase 4: Cameras
 

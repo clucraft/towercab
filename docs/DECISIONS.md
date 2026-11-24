@@ -323,3 +323,69 @@ no backward steps, no heading snaps, ground aircraft within 0.5 m of the surface
 the surface 1.5 s after touchdown. It passes in both base maps with simulated traffic and with live traffic
 at both airports. Taxiway alignment was spot-checked with live data: at KLAF 173 of 173 ground positions from
 six aircraft were on mapped taxiway or apron.
+
+## Polish and replay
+
+### D-042 The runway hint is a guess from the wind, and says so
+
+The side panel ranks runway ends by headwind component from the METAR and names the best one, with its
+headwind and crosswind. With calm or variable wind it names none. It does not look at which runway traffic is
+actually using, and the wording says it is a guess: the tower decides, not the wind.
+
+### D-043 How the aircraft list is grouped
+
+Six groups in the order a tower would care about them: Departing (takeoff roll and climbing out), Arriving
+(final and landing roll), Pattern, Taxiing, Parked, Passing through. The prompt lists the phases but not the
+grouping; rolls are folded into their direction so the list does not reshuffle for the few seconds a roll lasts.
+
+### D-044 Small screens
+
+At 900 px wide or 520 px high and below (a phone held sideways), the side panel starts closed and opens over
+the scene instead of beside it, the top bar and the footer become single rows that scroll sideways, the
+selection card moves to the left without its photo, and the badges move to the bottom. Portrait phones work
+but are not the target.
+
+### D-045 Imagery credits are named in the footer as well
+
+Cesium draws the Google and Cesium ion credits inside the 3D view, as their terms require. The footer repeats
+the imagery providers by name next to the data credits so everything used is listed in one place.
+
+### D-046 adsb.lol has a short-term limit that is not published (Verified, Deviation)
+
+The docs and the `x-ratelimit-*` headers describe only the daily quota (500 requests without a key). On
+2026-11-24 adsb.lol also answered HTTP 429 after nine requests two seconds apart, and again after about 80
+requests in ten minutes at seven seconds apart, both times with more than half the daily quota left; a minute
+later it answered normally. How that limit is counted is not known. The built-in interval is therefore 10 s,
+as a cautious default rather than a known-safe figure, and config may lower it to 3 s at most. In normal use
+this hardly matters: adsb.fi is the primary source, adsb.lol is asked on every third cycle at most, and the
+quota pacing spreads its 500 requests so that they are minutes apart.
+
+### D-047 Replay: what ships, and what is yours to record
+
+`?replay=<name>` plays `/replays/<name>.jsonl`: the same messages the WebSocket would carry, shifted to the
+present and looped. `pnpm record` makes them, either from a running server's feed or (`--direct`) from one
+source through the server's own tracker.
+
+- The recording that ships (`klaf-pattern`) was made from adsb.lol only, because its data is ODbL and may be
+  redistributed with attribution. adsb.fi's terms allow personal, non-commercial use, not redistribution, so
+  nothing recorded from it is committed. Recordings made from a server's mixed feed are written to
+  `.local/data/replays/` (or `/data/replays/` on a deployed server), which git ignores.
+- It asks every 7 s because of D-046, so positions are 7 s apart, and a recording of more than a few minutes
+  may be cut short by adsb.lol (the recorder stops at the first refusal and keeps what it has). The file
+  states its spacing (`intervalMs`), and playback then draws `intervalMs + 1.5 s` behind instead of the usual
+  2.5 s, so aircraft still move between known positions rather than being guessed ahead.
+- `klaf-pattern` is 3 min 45 s at KLAF on 2026-11-24: six aircraft, one of them flying the pattern, landing
+  and taxiing in. `pnpm verify:scene --airport KLAF --replay klaf-pattern --seconds 215` checks it frame by
+  frame like the simulated traffic.
+- Sparse data showed one flaw: the drawn "on the ground" state changed halfway between the last report in the
+  air and the first on the ground, while the aircraft was still metres up. It now changes at touchdown (and at
+  lift-off): an aircraft is on the ground only between two reports that both say so.
+- The prompt asks for `kind-busy` as well. A busy period at KIND is the overnight FedEx push; it was not
+  recorded during the build. `pnpm record --airport KIND --minutes 10 --out kind-busy` records it from your
+  own server when the time is right.
+
+### D-048 Secret scanning in CI runs gitleaks directly
+
+`gitleaks-action` scans `first-commit^..last-commit` on a push, which fails on the very first push of a
+repository (the first commit has no parent). CI downloads a pinned gitleaks release, checks it against the
+checksum published with that release, and scans the whole history instead.

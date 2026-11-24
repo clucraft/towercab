@@ -448,7 +448,7 @@ export class SceneController {
 
     if (this.ground instanceof ProbedGround) this.ground.beginFrame();
     const { store, config } = this.options;
-    const renderTime = store.serverNow() - config.renderDelayMs;
+    const renderTime = store.serverNow() - (store.renderDelayMs() ?? config.renderDelayMs);
     this.layer.update(renderTime, elapsed / 1000);
     if (this.followHex) this.updateFollow();
     if (now - this.lastTrailAt >= TRAIL_UPDATE_MS) {

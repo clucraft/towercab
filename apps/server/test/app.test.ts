@@ -90,6 +90,39 @@ describe('server', () => {
       expect(asset.headers['cache-control']).toContain('immutable');
     });
 
+    it('serves recordings and models, and a file in the data folder replaces the built-in one', async () => {
+      for (const [root, folder] of [
+        ['web', 'replays'],
+        ['web', 'models'],
+        ['data', 'replays'],
+        ['data', 'models'],
+      ] as const) {
+        await mkdir(join(dir, root, folder), { recursive: true });
+      }
+      await writeFile(join(dir, 'web', 'replays', 'shipped.jsonl'), '{"type":"meta","from":"app"}\n');
+      await writeFile(join(dir, 'web', 'replays', 'both.jsonl'), '{"type":"meta","from":"app"}\n');
+      await writeFile(join(dir, 'data', 'replays', 'both.jsonl'), '{"type":"meta","from":"data"}\n');
+      await writeFile(join(dir, 'data', 'replays', 'mine.jsonl'), '{"type":"meta","from":"data"}\n');
+      await writeFile(join(dir, 'web', 'models', 'jet.glb'), 'app');
+      await writeFile(join(dir, 'web', 'models', 'prop.glb'), 'app');
+      await writeFile(join(dir, 'data', 'models', 'jet.glb'), 'data');
+      await start();
+      const get = (url: string) => app.inject({ method: 'GET', url });
+
+      expect((await get('/replays/shipped.jsonl')).body).toContain('"app"');
+      expect((await get('/replays/mine.jsonl')).body).toContain('"data"');
+      expect((await get('/replays/both.jsonl')).body).toContain('"data"');
+      expect((await get('/models/prop.glb')).body).toBe('app');
+      expect((await get('/models/jet.glb')).body).toBe('data');
+
+      // Unknown names are a 404, never the app shell, and nothing outside the two folders is reachable.
+      for (const url of ['/replays/nope.jsonl', '/replays/..%2Fconfig%2Fconfig.yaml', '/models/nope.glb']) {
+        const res = await get(url);
+        expect(res.statusCode, url).toBe(404);
+        expect(res.headers['content-type'], url).toContain('application/json');
+      }
+    });
+
     it('returns JSON 404 for unknown API routes instead of the app shell', async () => {
       await start();
       const res = await app.inject({ method: 'GET', url: '/api/nope' });

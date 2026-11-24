@@ -66,6 +66,26 @@ describe('MotionBuffer', () => {
     expect(state?.overdueMs).toBeLessThan(0);
   });
 
+  it('is on the ground only between two reports that are both on the ground', () => {
+    // A landing, with reports seven seconds apart as in a recording.
+    const landing = new MotionBuffer();
+    landing.push(report(0, { heightM: 160, vertRateFpm: -300 }));
+    landing.push(report(7, { heightM: null, onGround: true }));
+    landing.push(report(14, { heightM: null, onGround: true }));
+    // Still coming down, right up to the first report on the ground.
+    expect(landing.sample(1000)?.onGround).toBe(false);
+    expect(landing.sample(6900)?.onGround).toBe(false);
+    expect(landing.sample(7100)?.onGround).toBe(true);
+
+    // A take-off: climbing from the moment it leaves the last report on the ground.
+    const takeoff = new MotionBuffer();
+    takeoff.push(report(0, { heightM: null, onGround: true }));
+    takeoff.push(report(7, { heightM: null, onGround: true }));
+    takeoff.push(report(14, { heightM: 170, vertRateFpm: 500 }));
+    expect(takeoff.sample(6900)?.onGround).toBe(true);
+    expect(takeoff.sample(7100)?.onGround).toBe(false);
+  });
+
   it('refuses a report that is not newer than the newest one', () => {
     const buffer = new MotionBuffer();
     expect(buffer.push(report(4))).toBe(true);

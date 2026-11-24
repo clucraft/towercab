@@ -201,6 +201,29 @@ async function mockBackend(page: Page): Promise<{ subscribed: () => string[] }> 
     }),
   );
   await page.route('**/api/airports/KLAF', (route) => route.fulfill({ json: AIRPORT }));
+  // A real observation from KLAF (2026-11-24 20:54Z), as the server decodes it.
+  await page.route('**/api/metar/KLAF', (route) =>
+    route.fulfill({
+      json: {
+        metar: {
+          icao: 'KLAF',
+          raw: 'METAR KLAF 242054Z 05005KT 10SM FEW034 04/M04 A3050 RMK AO2 SLP334 T00391039 55013',
+          obsTime: Date.now() - 20 * 60_000,
+          fetchedAt: Date.now(),
+          tempC: 3.9,
+          dewpointC: -3.9,
+          windDirDeg: 50,
+          windVariable: false,
+          windSpeedKt: 5,
+          windGustKt: null,
+          visibility: '10+',
+          altimHpa: 1032.9,
+          flightCategory: 'VFR',
+          clouds: [{ cover: 'FEW', baseFt: 3400 }],
+        },
+      },
+    }),
+  );
 
   await page.routeWebSocket('**/ws', (socket) => {
     let seq = 0;
@@ -326,4 +349,60 @@ test('the view presets and the URL stay in step', async ({ page }) => {
   await page.keyboard.press('2');
   await expect(page).toHaveURL(/view=overhead/);
   await expect(page.getByTestId('view-overhead')).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('the side panel lists the traffic, the weather hint and the sources', async ({ page }) => {
+  await mockBackend(page);
+  await page.goto('/KLAF');
+  await expect(page.getByTestId('airport-page')).toHaveAttribute('data-ready', 'true', { timeout: 60_000 });
+
+  const panel = page.getByTestId('side-panel');
+  await expect(panel).toBeVisible();
+  await expect(panel.getByRole('button', { name: /N2884L/ })).toBeVisible();
+  // Wind from 050 degrees: runway 05 faces straight into it.
+  await expect(panel.getByTestId('runway-hint')).toContainText('runway 05');
+  await expect(panel.getByRole('link', { name: /LiveATC/ })).toHaveAttribute('target', '_blank');
+  await expect(page.getByTestId('credits')).toContainText('CesiumJS');
+
+  // Picking a row selects that aircraft in the scene.
+  await panel.getByRole('button', { name: /N2884L/ }).click();
+  await expect(page.getByTestId('selection-panel')).toContainText('N2884L');
+
+  // The panel can be put away and brought back.
+  await page.getByTestId('panel-toggle').click();
+  await expect(panel).toBeHidden();
+  await page.getByTestId('panel-toggle').click();
+  await expect(panel).toBeVisible();
+});
+
+test('a recording plays back without the live feed', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (err) => errors.push(err.message));
+  const backend = await mockBackend(page);
+
+  await page.goto('/KLAF?replay=klaf-pattern');
+  await expect(page.getByTestId('airport-page')).toHaveAttribute('data-ready', 'true', { timeout: 60_000 });
+  // It says what it is, and never claims to be live.
+  await expect(page.getByTestId('connection')).toHaveText('replay', { timeout: 20_000 });
+  await expect(page.getByTestId('aircraft-count')).not.toHaveText('0 aircraft', { timeout: 20_000 });
+  await expect
+    .poll(async () => page.evaluate(() => window.__towercab?.stats().aircraft ?? 0), { timeout: 30_000 })
+    .toBeGreaterThan(0);
+  expect(backend.subscribed()).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test('a small landscape screen starts with the panel closed', async ({ page }) => {
+  await page.setViewportSize({ width: 740, height: 360 });
+  await mockBackend(page);
+  await page.goto('/KLAF');
+  await expect(page.getByTestId('airport-page')).toHaveAttribute('data-ready', 'true', { timeout: 60_000 });
+  await expect(page.getByTestId('side-panel')).toBeHidden();
+  await page.getByTestId('panel-toggle').click();
+  await expect(page.getByTestId('side-panel')).toBeVisible();
+  // Nothing makes the page itself scroll sideways.
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
 });

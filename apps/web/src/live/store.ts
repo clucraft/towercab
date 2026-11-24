@@ -14,6 +14,11 @@ export interface Feed {
   stop(): void;
   /** The clock positions are stamped with. */
   serverNow(): number;
+  /**
+   * How far behind that clock the scene should draw, when the feed knows better than the default: a
+   * recording with positions seven seconds apart has to be drawn further behind than live data.
+   */
+  renderDelayMs?(): number | undefined;
 }
 
 export type FeedFactory = (handlers: LiveClientHandlers) => Feed;
@@ -95,12 +100,15 @@ export class LiveStore {
     this.feed.stop();
     if (this.notifyTimer) clearTimeout(this.notifyTimer);
     this.notifyTimer = null;
-    this.messageListeners.clear();
-    this.changeListeners.clear();
   }
 
   serverNow(): number {
     return this.feed.serverNow();
+  }
+
+  /** The feed's own render delay, if it has one. */
+  renderDelayMs(): number | undefined {
+    return this.feed.renderDelayMs?.();
   }
 
   /** Every snapshot and delta, as it arrives. For the scene. */

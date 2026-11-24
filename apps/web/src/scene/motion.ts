@@ -194,7 +194,9 @@ export class MotionBuffer {
           headingA != null && headingB != null ? lerpAngleDeg(headingA, headingB, u) : (headingA ?? headingB),
         speedMps: span > 0 ? Math.hypot(east, north) / (span / 1000) : 0,
         vertRateFpm: u < 0.5 ? a.vertRateFpm : b.vertRateFpm,
-        onGround: u < 0.5 ? a.onGround : b.onGround,
+        // Between a report in the air and one on the ground the aircraft is still coming down (or already
+        // climbing): it is on the ground only between two reports that both say so.
+        onGround: a.onGround && b.onGround,
         alpha: 1,
         overdueMs: t - last.t,
       };

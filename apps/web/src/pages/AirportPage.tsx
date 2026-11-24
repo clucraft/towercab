@@ -1,18 +1,24 @@
-import type { AirportDetail, AirportSummary, ClientConfig } from '@towercab/shared';
+import type { AirportDetail, AirportSummary, ClientConfig, Metar } from '@towercab/shared';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { api } from '../api';
-import { LiveStore, webSocketFeed } from '../live/store';
+import { replayFeed } from '../live/replayFeed';
+import { type FeedFactory, LiveStore, webSocketFeed } from '../live/store';
 import { navigate, setQuery, useLocation } from '../router';
 import type { SceneController, SceneMode, SceneStats } from '../scene/SceneController';
 import { buildViewPresets, viewForShortcut } from '../scene/views';
 import { simFeed } from '../sim/simFeed';
 import { SelectionPanel } from '../ui/SelectionPanel';
+import { SidePanel } from '../ui/SidePanel';
 import { TopBar } from '../ui/TopBar';
 
 interface Notice {
   id: number;
   text: string;
 }
+
+const METAR_REFRESH_MS = 5 * 60_000;
+/** On a phone held sideways, or any small window, the side panel starts closed and opens over the scene. */
+const SMALL_SCREEN = '(max-width: 900px), (max-height: 520px)';
 
 /** `/KLAF`: the 3D view of one airport. */
 export function AirportPage({ icao }: { icao: string }) {
@@ -62,20 +68,30 @@ export function AirportPage({ icao }: { icao: string }) {
   return <AirportScene key={airport.icao} airport={airport} airports={airports} config={config} />;
 }
 
+/** Picks where traffic comes from: the server, a recording (`?replay=name`) or the simulator (`?sim=150`). */
+function chooseFeed(
+  params: URLSearchParams,
+  airport: AirportDetail,
+): { factory: FeedFactory; label: string | null } {
+  const replay = params.get('replay');
+  if (replay && /^[a-z0-9-]{1,64}$/i.test(replay)) return { factory: replayFeed(replay), label: 'replay' };
+  const sim = Number(params.get('sim') ?? 0);
+  if (sim > 0) return { factory: simFeed(airport, Math.min(sim, 500)), label: 'simulated' };
+  return { factory: webSocketFeed, label: null };
+}
+
 function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[]; config: ClientConfig }) {
-  const { airport, airports, config } = props;
+  const { airports, config } = props;
   const { search } = useLocation();
   // Read the URL once: it sets where the scene starts, and is kept up to date from then on.
   const initial = useRef(new URLSearchParams(search)).current;
-  const simCount = Number(initial.get('sim') ?? 0);
   const showFps = initial.has('fps');
 
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneController | null>(null);
-  const [store] = useState(
-    () =>
-      new LiveStore(airport.icao, simCount > 0 ? simFeed(airport, Math.min(simCount, 500)) : webSocketFeed),
-  );
+  const [airport, setAirport] = useState(props.airport);
+  const [feed] = useState(() => chooseFeed(initial, props.airport));
+  const [store] = useState(() => new LiveStore(props.airport.icao, feed.factory));
   const [ready, setReady] = useState(false);
   const [mode, setMode] = useState<SceneMode>(
     initial.get('mode') === 'schematic' || !config.features.photoreal ? 'schematic' : 'photoreal',
@@ -83,6 +99,8 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
   const [view, setView] = useState<string>(initial.get('view') ?? airport.defaultView);
   const [selected, setSelected] = useState<string | null>(null);
   const [trails, setTrails] = useState(true);
+  const [panelOpen, setPanelOpen] = useState(() => !window.matchMedia(SMALL_SCREEN).matches);
+  const [metar, setMetar] = useState<Metar | null>(null);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [stats, setStats] = useState<SceneStats | null>(null);
   const [, setTick] = useState(0);
@@ -158,7 +176,47 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
     };
   }, []);
 
-  // Ages in the selection panel count up between updates; the frame rate badge refreshes.
+  // The airport layout comes from OpenStreetMap and may still be on its way the first time an airport
+  // is opened. Ask again a few times until it is there.
+  useEffect(() => {
+    if (airport.layout) return;
+    let attempts = 0;
+    const timer = setInterval(() => {
+      attempts += 1;
+      if (attempts > 6) clearInterval(timer);
+      api
+        .airport(airport.icao)
+        .then((next) => {
+          if (!next.layout) return;
+          clearInterval(timer);
+          setAirport(next);
+          sceneRef.current?.setAirport(next);
+        })
+        .catch(() => {
+          // Keep what we have.
+        });
+    }, 20_000);
+    return () => clearInterval(timer);
+  }, [airport]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const load = () =>
+      api
+        .metar(airport.icao, controller.signal)
+        .then(setMetar)
+        .catch(() => {
+          // The panel says "no METAR"; nothing else to do.
+        });
+    void load();
+    const timer = setInterval(load, METAR_REFRESH_MS);
+    return () => {
+      controller.abort();
+      clearInterval(timer);
+    };
+  }, [airport.icao]);
+
+  // Ages count up between updates; the frame rate badge refreshes.
   useEffect(() => {
     const timer = setInterval(() => {
       setTick((t) => t + 1);
@@ -169,6 +227,7 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
 
   const changeMode = useCallback((next: SceneMode) => void sceneRef.current?.setMode(next), []);
   const changeView = useCallback((id: string) => sceneRef.current?.setView(id), []);
+  const select = useCallback((hex: string | null) => sceneRef.current?.select(hex), []);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -195,6 +254,13 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
   }, [selected, notify]);
 
   const selectedAircraft = selected ? store.aircraft.get(selected) : undefined;
+  const now = store.serverNow();
+  // Imagery credits are shown by Cesium inside the 3D view; they are repeated here by name.
+  const imagery = [
+    mode === 'photoreal' ? 'Google' : null,
+    mode === 'photoreal' || config.features.terrain ? 'Cesium ion' : null,
+    'CesiumJS',
+  ].filter(Boolean);
 
   return (
     <div className="app" data-testid="airport-page" data-ready={ready} data-mode={mode}>
@@ -207,6 +273,7 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
         view={view}
         hasSelection={Boolean(selected)}
         trails={trails}
+        panelOpen={panelOpen}
         onAirport={(next) => navigate(`/${next}`)}
         onMode={changeMode}
         onView={changeView}
@@ -214,51 +281,72 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
           setTrails(enabled);
           sceneRef.current?.setTrails(enabled);
         }}
+        onPanel={() => setPanelOpen((open) => !open)}
       />
 
-      <div className="stage">
-        <div className="scene" ref={containerRef} data-testid="scene" />
-        {!ready && <div className="scene-loading muted">Starting the 3D scene…</div>}
+      <div className={`workspace${panelOpen ? ' with-panel' : ''}`}>
+        <div className="stage">
+          <div className="scene" ref={containerRef} data-testid="scene" />
+          {!ready && <div className="scene-loading muted">Starting the 3D scene…</div>}
 
-        <div className="notices" aria-live="polite">
-          {notices.map((n) => (
-            <div key={n.id} className="notice">
-              {n.text}
-            </div>
-          ))}
-        </div>
+          <div className="notices" aria-live="polite">
+            {store.error && <div className="notice">{store.error.message}</div>}
+            {notices.map((n) => (
+              <div key={n.id} className="notice">
+                {n.text}
+              </div>
+            ))}
+          </div>
 
-        <div className="badges">
-          <span className={`pill pill-${store.connection}`} data-testid="connection">
-            {store.connection === 'open' ? 'live' : store.connection}
-          </span>
-          <span className="pill" data-testid="aircraft-count">
-            {store.aircraft.size} aircraft
-          </span>
-          {simCount > 0 && <span className="pill">simulated</span>}
-          {showFps && stats && (
-            <span className="pill" data-testid="fps">
-              {stats.fps.toFixed(0)} fps · {stats.frameMs.toFixed(1)} ms
+          <div className="badges">
+            {/* A recording or the simulator must never read as "live". */}
+            <span
+              className={`pill ${feed.label && store.connection === 'open' ? 'pill-note' : `pill-${store.connection}`}`}
+              data-testid="connection"
+            >
+              {store.connection === 'open' ? (feed.label ?? 'live') : store.connection}
             </span>
+            <span className="pill" data-testid="aircraft-count">
+              {store.aircraft.size} aircraft
+            </span>
+            {showFps && stats && (
+              <span className="pill" data-testid="fps">
+                {stats.fps.toFixed(0)} fps · {stats.frameMs.toFixed(1)} ms
+              </span>
+            )}
+          </div>
+
+          {selectedAircraft && (
+            <SelectionPanel
+              aircraft={selectedAircraft}
+              now={now}
+              photos={config.features.photos}
+              following={view === 'follow'}
+              onFollow={() => sceneRef.current?.follow(selectedAircraft.hex)}
+              onClose={() => select(null)}
+            />
           )}
         </div>
 
-        {selectedAircraft && (
-          <SelectionPanel
-            aircraft={selectedAircraft}
-            now={store.serverNow()}
-            photos={config.features.photos}
-            following={view === 'follow'}
-            onFollow={() => sceneRef.current?.follow(selectedAircraft.hex)}
-            onClose={() => sceneRef.current?.select(null)}
+        {panelOpen && (
+          <SidePanel
+            airport={airport}
+            aircraft={[...store.aircraft.values()]}
+            status={store.status}
+            metar={metar}
+            now={now}
+            feedLabel={feed.label}
+            selected={selected}
+            onSelect={(hex) => select(hex)}
+            onClose={() => setPanelOpen(false)}
           />
         )}
       </div>
 
       <footer className="attribution">
-        <span>Not for navigation or operational use.</span>
-        <span className="credits">
-          Data:{' '}
+        <span className="disclaimer">Not for navigation or operational use.</span>
+        <span className="credits" data-testid="credits">
+          Imagery: {imagery.join(', ')}. Data:{' '}
           {config.attributions.map((a, i) => (
             <span key={a.name}>
               {i > 0 && ', '}
@@ -268,6 +356,7 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
               {a.note ? ` (${a.note})` : ''}
             </span>
           ))}
+          .
         </span>
       </footer>
     </div>

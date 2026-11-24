@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AGGREGATORS, createAggregatorSource } from '../src/providers/aggregators';
+import { AGGREGATORS, createAggregatorSource, effectiveMinIntervalMs } from '../src/providers/aggregators';
 import { fetchJson, parseRateHeaders, parseRetryAfter } from '../src/providers/http';
 import { createOpenSkySource, OPENSKY_TOKEN_URL, parseOpenSkyStates } from '../src/providers/opensky';
 import {
@@ -306,6 +306,27 @@ describe('aggregator adapters', () => {
       kind: 'forbidden',
       message: expect.stringContaining('contact@airplanes.live'),
     });
+  });
+});
+
+describe('request spacing from config', () => {
+  it('uses the built-in gap when config says nothing', () => {
+    expect(effectiveMinIntervalMs(AGGREGATORS.adsbfi, undefined)).toBe(1100);
+    expect(effectiveMinIntervalMs(AGGREGATORS.adsblol, undefined)).toBe(10_000);
+  });
+
+  it('lets config slow a source down as far as it likes', () => {
+    expect(effectiveMinIntervalMs(AGGREGATORS.adsbfi, 5000)).toBe(5000);
+    expect(effectiveMinIntervalMs(AGGREGATORS.adsblol, 60_000)).toBe(60_000);
+  });
+
+  it('never lets config undercut a published limit or a floor', () => {
+    // adsb.fi publishes one request per second: the built-in gap is the floor.
+    expect(effectiveMinIntervalMs(AGGREGATORS.adsbfi, 250)).toBe(1100);
+    expect(effectiveMinIntervalMs(AGGREGATORS.airplaneslive, 250)).toBe(1100);
+    // adsb.lol's built-in gap is a cautious default; it can be lowered, but only to its floor.
+    expect(effectiveMinIntervalMs(AGGREGATORS.adsblol, 5000)).toBe(5000);
+    expect(effectiveMinIntervalMs(AGGREGATORS.adsblol, 250)).toBe(3000);
   });
 });
 

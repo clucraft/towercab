@@ -11,10 +11,12 @@ interface Props {
   view: string;
   hasSelection: boolean;
   trails: boolean;
+  panelOpen: boolean;
   onAirport(icao: string): void;
   onMode(mode: SceneMode): void;
   onView(id: string): void;
   onTrails(enabled: boolean): void;
+  onPanel(): void;
 }
 
 /** Airport switcher, base map switch and view presets. */
@@ -125,6 +127,16 @@ export function TopBar(props: Props) {
       <a className="link" href={`/debug/${props.icao}`}>
         Table
       </a>
+      <button
+        type="button"
+        className={props.panelOpen ? 'on' : ''}
+        aria-pressed={props.panelOpen}
+        onClick={props.onPanel}
+        data-testid="panel-toggle"
+        title="Aircraft list, weather and data sources"
+      >
+        Panel
+      </button>
     </header>
   );
 }

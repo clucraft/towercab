@@ -578,3 +578,353 @@ a.link {
 .attribution a {
   color: inherit;
 }
+
+/* ---- side panel ---- */
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 0;
+}
+
+.workspace.with-panel {
+  grid-template-columns: minmax(0, 1fr) 20rem;
+}
+
+.side-panel {
+  min-height: 0;
+  overflow-y: auto;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  font-size: 0.9rem;
+}
+
+.side-panel > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.side-panel > header h2 {
+  margin: 0;
+  color: var(--accent);
+  font-size: 1.05rem;
+  letter-spacing: 0.06em;
+}
+
+.side-panel button.icon {
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.side-panel button.icon:hover {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.side-panel details {
+  padding: 0.5rem 0.75rem 0.7rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.side-panel summary {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.side-panel summary .count,
+.side-panel h3 .count {
+  margin-left: 0.3rem;
+  color: var(--text);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.side-panel p {
+  margin: 0.5rem 0 0;
+}
+
+.side-panel .small {
+  font-size: 0.8rem;
+}
+
+.side-panel ul {
+  margin: 0.3rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.side-panel .group h3 {
+  margin: 0.6rem 0 0.1rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.aircraft-row {
+  display: grid;
+  grid-template-columns: 5.2rem 3rem 1fr;
+  align-items: baseline;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.2rem 0.4rem;
+  border: 0;
+  border-left: 3px solid var(--muted);
+  border-radius: 0 4px 4px 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.aircraft-row:hover {
+  background: var(--panel-2);
+}
+
+.aircraft-row.selected {
+  background: rgba(63, 208, 255, 0.14);
+  outline: 1px solid var(--accent);
+}
+
+.aircraft-row .callsign {
+  font-family: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+  font-weight: 600;
+}
+
+.aircraft-row .type {
+  color: var(--muted);
+}
+
+.aircraft-row .detail {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.phase-edge-parked {
+  border-left-color: var(--phase-parked);
+}
+.phase-edge-taxiing {
+  border-left-color: var(--phase-taxiing);
+}
+.phase-edge-takeoff_roll {
+  border-left-color: var(--phase-takeoff_roll);
+}
+.phase-edge-departing {
+  border-left-color: var(--phase-departing);
+}
+.phase-edge-arriving {
+  border-left-color: var(--phase-arriving);
+}
+.phase-edge-landing_roll {
+  border-left-color: var(--phase-landing_roll);
+}
+.phase-edge-pattern {
+  border-left-color: var(--phase-pattern);
+}
+.phase-edge-transit {
+  border-left-color: var(--phase-transit);
+}
+
+.metar-raw {
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  background: var(--bg);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+dl.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.75rem;
+  margin: 0.5rem 0 0;
+}
+
+dl.facts dt {
+  color: var(--muted);
+}
+
+dl.facts dd {
+  margin: 0;
+  text-align: right;
+}
+
+.category {
+  padding: 0 0.4rem;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.category-VFR {
+  color: var(--ok);
+}
+.category-MVFR {
+  color: #60a5fa;
+}
+.category-IFR {
+  color: var(--bad);
+}
+.category-LIFR {
+  color: #e879f9;
+}
+
+.runway-hint strong {
+  color: var(--accent);
+}
+
+.sources .source {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.1rem 0.45rem;
+  padding: 0.25rem 0;
+}
+
+.sources .source-detail {
+  grid-column: 2 / -1;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.dot-ok {
+  background: var(--ok);
+}
+.dot-degraded,
+.dot-backoff,
+.dot-idle {
+  background: var(--warn);
+}
+.dot-blocked,
+.dot-disabled {
+  background: var(--bad);
+}
+
+.links li {
+  padding: 0.15rem 0;
+}
+
+.links a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.links a:hover {
+  text-decoration: underline;
+}
+
+.pill-note {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+/* ---- small screens: a phone held sideways ---- */
+
+@media (max-width: 900px), (max-height: 520px) {
+  :root {
+    font-size: 13px;
+  }
+
+  .topbar {
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+    padding: 0.25rem max(0.5rem, env(safe-area-inset-left)) 0.25rem max(0.5rem, env(safe-area-inset-right));
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .topbar > * {
+    flex: none;
+  }
+
+  .topbar .spacer {
+    display: none;
+  }
+
+  .topbar select {
+    max-width: 9rem;
+  }
+
+  /* The bar scrolls sideways; the panel button stays in reach at its right edge. */
+  .topbar [data-testid="panel-toggle"] {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    margin-left: auto;
+    box-shadow: -0.6rem 0 0.5rem var(--panel);
+  }
+
+  .views {
+    flex-wrap: nowrap;
+  }
+
+  /* The panel slides over the scene instead of taking width from it. */
+  .workspace.with-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace {
+    position: relative;
+  }
+
+  .side-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+    width: min(20rem, 82vw);
+    padding-right: env(safe-area-inset-right);
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.5);
+  }
+
+  .selection {
+    top: 0.4rem;
+    right: auto;
+    left: 0.4rem;
+    width: min(16rem, 60vw);
+    max-height: calc(100% - 0.8rem);
+    padding: 0.5rem;
+  }
+
+  .selection .photo {
+    display: none;
+  }
+
+  .badges {
+    top: auto;
+    bottom: 1.6rem;
+    left: max(0.4rem, env(safe-area-inset-left));
+  }
+
+  .attribution {
+    flex-wrap: nowrap;
+    padding: 0.15rem max(0.5rem, env(safe-area-inset-left));
+    font-size: 0.7rem;
+    white-space: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+}
