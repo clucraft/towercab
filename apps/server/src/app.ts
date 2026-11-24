@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance, LogController } from 'fastify';
@@ -21,6 +22,8 @@ export async function buildApp(services: Services): Promise<FastifyInstance> {
     logController: new LogController({ disableRequestLogging: !['debug', 'trace'].includes(env.logLevel) }),
   });
 
+  const webDist = env.webDist ?? findUp(join('apps', 'web', 'dist'));
+
   app.get('/healthz', async () => ({
     status: 'ok',
     version: env.version,
@@ -32,7 +35,23 @@ export async function buildApp(services: Services): Promise<FastifyInstance> {
   services.hub.attach(app.server);
   app.addHook('onClose', async () => services.close());
 
-  const webDist = env.webDist ?? findUp(join('apps', 'web', 'dist'));
+  // A model placed in /data/models replaces the built-in one of the same name.
+  const modelOverrides = join(env.dataDir, 'models');
+  app.get<{ Params: { file: string } }>('/models/:file', async (request, reply) => {
+    const { file } = request.params;
+    if (!/^[a-z0-9-]+\.glb$/.test(file)) return reply.code(404).send({ error: 'not_found' });
+    for (const dir of [modelOverrides, webDist ? join(webDist, 'models') : null]) {
+      if (!dir) continue;
+      try {
+        const body = await readFile(join(dir, file));
+        return reply.type('model/gltf-binary').header('Cache-Control', 'public, max-age=3600').send(body);
+      } catch {
+        // not in this directory
+      }
+    }
+    return reply.code(404).send({ error: 'not_found', message: `No model named ${file}` });
+  });
+
   if (webDist && existsSync(join(webDist, 'index.html'))) {
     await app.register(fastifyStatic, {
       root: webDist,
@@ -41,6 +60,9 @@ export async function buildApp(services: Services): Promise<FastifyInstance> {
         // Vite fingerprints everything under /assets, so those files can be cached forever.
         if (path.startsWith(join(webDist, 'assets'))) {
           reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+        } else if (path.startsWith(join(webDist, 'cesium'))) {
+          // The assets Cesium loads at run time change only with a Cesium upgrade.
+          reply.header('Cache-Control', 'public, max-age=86400');
         } else if (path.endsWith('index.html')) {
           reply.header('Cache-Control', 'no-cache');
         }

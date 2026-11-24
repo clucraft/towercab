@@ -1,10 +1,11 @@
 import type { AirportSummary } from '@towercab/shared';
 import { useEffect, useState } from 'react';
 import { api } from './api';
+import { AirportPage } from './pages/AirportPage';
 import { DebugPage } from './pages/DebugPage';
 import { navigate, useRoute } from './router';
 
-/** Landing page: the configured airports. The 3D scene replaces the airport page in Phase 2. */
+/** Landing page: the configured airports. */
 function Home() {
   const [airports, setAirports] = useState<AirportSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,8 +59,7 @@ export function App() {
     case 'debug':
       return <DebugPage icao={route.icao} />;
     case 'airport':
-      // The 3D scene arrives in Phase 2; until then the airport URL shows the live table.
-      return <DebugPage icao={route.icao} />;
+      return <AirportPage icao={route.icao} />;
     default:
       return (
         <main className="placeholder">

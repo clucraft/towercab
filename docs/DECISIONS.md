@@ -219,3 +219,107 @@ photo page, as their API requires.
 
 Phase 1 needs no database: OurAirports and OSM are cached as plain files, as the prompt specifies.
 `better-sqlite3` is added in Phase 4 with the discovery queue.
+
+## 3D scene
+
+### D-032 Google Map Tiles policy, re-checked (Verified)
+
+Read on 2026-11-24 (<https://developers.google.com/maps/documentation/tile/policies>). What it means here:
+
+- No pre-fetching, caching or storing of tiles beyond what the HTTP cache headers allow, and no content
+  derived from them. TowerCab never proxies or saves tiles; the browser talks to Google or Cesium ion directly.
+  Surface heights read from the tiles to stand aircraft on them are kept in memory for the session and never
+  written or sent anywhere.
+- Overlaying non-Google data is allowed, with its attribution kept separate from Google's. Even so, the
+  prompt's rule is kept: the OpenStreetMap layout is drawn in Schematic only. Photoreal shows our own
+  aircraft, labels and trails over the tiles.
+- The Google Maps logo and data attribution must stay visible. They are shown by Cesium's credit display
+  inside the 3D view (`showCreditsOnScreen: true`); the app's own credits are in a separate footer below it.
+
+### D-033 How Photoreal is reached, and when it gives up
+
+With `GOOGLE_MAPS_API_KEY` the tiles come straight from the Map Tiles API; otherwise through Cesium ion
+(`createGooglePhotorealistic3DTileset`, signature checked in CesiumJS 1.147). The scene falls back to
+Schematic with a notice when: the tileset cannot be created; a tile request is refused (401, 403) or over
+quota (429); twelve tiles fail within 20 s; or no tiles have arrived after 25 s of rendering. That last
+timer counts rendered frames only, so a tab left in the background does not trip it.
+
+### D-034 Surface heights: read from loaded tiles, not `sampleHeightMostDetailed` (Deviation)
+
+The prompt suggests `sampleHeightMostDetailed` or `clampToHeight`. Measured with 60 aircraft on the ground at
+KIND, `sampleHeightMostDetailed` managed about 13 points a second and held the frame rate at 9 fps while it
+worked; ground aircraft were still waiting for their height after 40 s. Photoreal therefore uses
+`Cesium3DTileset.getHeight` (with `enableCollision`), which reads the tiles that are loaded: synchronous,
+about a millisecond a point, and it puts an aircraft on the surface exactly as it is drawn. Details:
+
+- heights are kept on a 10 m grid for 20 s, then read again, so aircraft follow the tiles as they refine;
+- at most three reads per frame, shared round-robin between aircraft;
+- the value used is the median of the cell and its four diagonal neighbours, which ignores the lump left
+  where an aircraft stood when the photogrammetry was captured, without dropping through a bridge;
+- a value more than 120 m from field elevation is discarded (coarse far-away tiles can be that wrong);
+- while a new cell is being read, an aircraft keeps the height it last stood on.
+
+Schematic with terrain uses `sampleTerrainMostDetailed` in batches with the same grid. The aircraft
+themselves are never part of a sample.
+
+### D-035 Flat Schematic measures heights from the field
+
+With no ion token there is no terrain, and the globe surface is the ellipsoid. Everything is then drawn
+relative to field elevation: the ground is at zero and an aircraft at 1,000 ft above the field is 305 m up.
+Switching base map moves the camera by the difference, so the view does not jump.
+
+### D-036 Labels are drawn on a 2D canvas over the scene
+
+Not Cesium labels. A canvas of our own allows real overlap avoidance (greedy placement over eight slots
+around each aircraft, most important first, each label keeping last frame's slot when it can), leader lines,
+and later the same labels over a webcam picture.
+
+### D-037 Aircraft models
+
+`scripts/gen-models.ts` generates one low-poly glTF per class with gltf-transform: 14 classes, 84 to 616
+triangles each. Every model is exactly one wingspan wide and stands on Y = 0, so scaling by the real wingspan
+draws it at real size with its wheels on the ground. Scale is uniform; a stretched variant (A321 against
+A319) has the right span and a slightly wrong length. There is no minimum pixel size: aircraft are their real
+size at any distance, and the label marker is what makes a distant one findable.
+
+### D-038 Frame rate, measured
+
+KIND, 150 simulated aircraft, 1600 x 900, Chromium with the GPU on (`pnpm probe`), on the development
+machine (RTX 5090, 16-core CPU; well above "mid-range", so the throttled figures matter more):
+
+| Case          | Schematic                                          | Photoreal                     |
+| ------------- | -------------------------------------------------- | ----------------------------- |
+| As is         | 60 fps (display cap), 0.9 ms of our code per frame | 60 fps, 3.3 ms                |
+| CPU slowed 2x | not measured                                       | 50 fps before the fixes below |
+| CPU slowed 4x | 47 fps                                             | 17 fps                        |
+
+The GPU cannot be slowed the same way, so integrated graphics are not covered by these numbers; Photoreal on
+integrated graphics is the case to check on real hardware. Two things found on the way:
+
+- Cesium builds a dynamic environment map per model. With 150 moving models that cost more than the rest of
+  the frame together (4x CPU: 27 to 47 fps in Schematic, 7 to 17 in Photoreal). It is switched off; a fixed
+  directional light is used instead.
+- Per-frame work is spread out: surface reads are rationed, trails rebuild five times a second.
+
+### D-039 Tower positions come from the FAA Digital Obstacle File (Verified)
+
+OpenStreetMap has no control tower mapped at KLAF or KIND. The FAA DOF dated 2026-11-22 lists both as
+`CTRL TWR`: KIND 18-002631 at 39°42'31.20"N 086°18'16.05"W, 348 ft AGL; KLAF 18-023128 at 40°24'53.14"N
+086°55'59.87"W, 84 ft AGL (accuracy code 1A: within 20 ft horizontally, 3 ft vertically). The example config
+carries them with an eye height a little below the top of the structure, marked approximate.
+
+### D-040 The scene runs 2.5 s behind, on a slewed clock
+
+The prompt says about 2 s. With a 2 s poll plus up to a second of upstream latency, 2.5 s keeps the scene
+interpolating rather than dead-reckoning almost all the time; `client.renderDelayMs` changes it. The estimate
+of the server's clock is slewed at 2% rather than applied at once: a 20 ms correction applied in one frame
+moves an aircraft on final by more than a metre.
+
+### D-041 Simulated traffic and measured acceptance checks
+
+`?sim=150` replaces the live feed with deterministic simulated traffic (circuits to every runway end, taxiing,
+parked). `pnpm verify:scene` then measures what Phase 2 promises, frame by frame in a real browser: no jumps,
+no backward steps, no heading snaps, ground aircraft within 0.5 m of the surface, and a landing aircraft on
+the surface 1.5 s after touchdown. It passes in both base maps with simulated traffic and with live traffic
+at both airports. Taxiway alignment was spot-checked with live data: at KLAF 173 of 173 ground positions from
+six aircraft were on mapped taxiway or apron.

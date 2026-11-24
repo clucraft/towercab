@@ -8,13 +8,16 @@ airports:
   - icao: KLAF
     radiusNm: 6 # geofence radius around the airport reference point
     ceilingFtAgl: 5000 # hide traffic above this height over the field
-    tower: null # null = take the tower from OpenStreetMap when it is mapped there.
-      # To set it yourself: { lat: .., lon: .., heightM: .., approximate: true }
+    # Control tower, for the Tower cab view. Position from the FAA Digital Obstacle File of 2026-11-22
+    # (OAS 18-023128, CTRL TWR, 84 ft AGL). heightM is the eye height, taken as a little below the top of
+    # the structure, so it is marked approximate. Set `tower: null` to use OpenStreetMap, when it has one.
+    tower: { lat: 40.414761, lon: -86.933297, heightM: 23, approximate: true }
     defaultView: tower # tower | overhead | orbit | rwy-<designator>, e.g. rwy-10
   - icao: KIND
     radiusNm: 8
     ceilingFtAgl: 6000
-    tower: null
+    # FAA Digital Obstacle File of 2026-11-22: OAS 18-002631, CTRL TWR, 348 ft AGL.
+    tower: { lat: 39.708667, lon: -86.304458, heightM: 95, approximate: true }
     defaultView: overhead
 
 # ADS-B sources. Lower priority number = preferred. Any combination can be enabled.

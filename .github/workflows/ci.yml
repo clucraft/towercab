@@ -28,6 +28,9 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - name: Install Chromium for the smoke test
+        run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
 
   docker:
     name: Docker build

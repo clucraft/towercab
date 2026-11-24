@@ -104,16 +104,16 @@ towercab/
 - [x] WebSocket protocol + hub, REST endpoints
 - [x] `/debug/:icao` live table
 - [x] `scripts/soak.ts`
-- [ ] Done when: live aircraft at both airports, provider health visible, 30 min soak with no 429, polling stops with no viewers
+- [x] Done when: live aircraft at both airports, provider health visible, 30 min soak with no 429, polling stops with no viewers
 
 ### Phase 2: 3D scene
 
-- [ ] Cesium viewer, static assets, airport routing
-- [ ] Photoreal (ion + direct Google key) with automatic fallback
-- [ ] `scripts/gen-models.ts` and the class models
-- [ ] AircraftLayer: interpolation buffer, extrapolate + fade, heading freeze, pitch, ground clamping
-- [ ] Label overlay with declutter, selection card, view presets, follow camera
-- [ ] Done when: aircraft sit on taxiways at KIND, no jitter, wheels on the runway, 60 fps with 150 simulated aircraft
+- [x] Cesium viewer, static assets, airport routing
+- [x] Photoreal (ion + direct Google key) with automatic fallback
+- [x] `scripts/gen-models.ts` and the class models
+- [x] AircraftLayer: interpolation buffer, extrapolate + fade, heading freeze, pitch, ground clamping
+- [x] Label overlay with declutter, selection card, view presets, follow camera
+- [x] Done when: aircraft sit on taxiways at KIND, no jitter, wheels on the runway, 60 fps with 150 simulated aircraft
 
 ### Phase 3: Schematic mode and polish
 

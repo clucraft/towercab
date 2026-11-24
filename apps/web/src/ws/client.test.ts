@@ -246,4 +246,41 @@ describe('LiveClient', () => {
     expect(client.serverNow()).toBe(Date.now() + 4980);
     client.close();
   });
+
+  it('slews the clock when the estimate shifts, so nothing drawn from it jumps', () => {
+    const client = make();
+    client.subscribe('KLAF');
+    latest().open();
+    latest().receive({ type: 'ping', serverTime: Date.now() + 5000 - 60 });
+    expect(client.serverNow()).toBe(Date.now() + 4940);
+
+    // A faster message arrives: the estimate improves by 40 ms in one go.
+    latest().receive({ type: 'ping', serverTime: Date.now() + 5000 - 20 });
+    expect(client.clockOffset()).toBe(4980);
+    // One frame later the clock has moved by a third of a millisecond, not forty.
+    vi.advanceTimersByTime(16);
+    expect(client.serverNow() - Date.now()).toBeCloseTo(4940.32, 1);
+    // It runs 2% fast until it has caught up, two seconds later.
+    vi.advanceTimersByTime(1000);
+    expect(client.serverNow() - Date.now()).toBeCloseTo(4960.32, 1);
+    vi.advanceTimersByTime(1500);
+    expect(client.serverNow() - Date.now()).toBe(4980);
+    // Time never runs backwards while slewing down either.
+    const before = client.serverNow();
+    latest().receive({ type: 'ping', serverTime: Date.now() + 5000 - 20 });
+    vi.advanceTimersByTime(16);
+    expect(client.serverNow()).toBeGreaterThan(before);
+    client.close();
+  });
+
+  it('jumps straight to a clock that is seconds off, as after a reconnect', () => {
+    const client = make();
+    client.subscribe('KLAF');
+    latest().open();
+    latest().receive({ type: 'ping', serverTime: Date.now() + 100 });
+    expect(client.serverNow()).toBe(Date.now() + 100);
+    for (let i = 0; i < 25; i += 1) latest().receive({ type: 'ping', serverTime: Date.now() - 30_000 });
+    expect(client.serverNow()).toBe(Date.now() - 30_000);
+    client.close();
+  });
 });

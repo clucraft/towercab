@@ -281,3 +281,300 @@ table.data td.muted {
 .debug section {
   overflow-x: auto;
 }
+
+/* ---- 3D airport page ---- */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.app {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100%;
+  min-height: 0;
+}
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.topbar .brand {
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+}
+
+.topbar .spacer {
+  flex: 1;
+}
+
+.topbar select,
+.topbar button,
+.selection button.primary {
+  height: 1.9rem;
+  padding: 0 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.topbar button:hover:not(:disabled),
+.topbar select:hover {
+  border-color: var(--muted);
+}
+
+.topbar button:disabled {
+  color: #4b5a6b;
+  cursor: not-allowed;
+}
+
+.topbar button.on,
+.topbar select.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.topbar :focus-visible,
+.selection :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.segmented {
+  display: inline-flex;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.segmented button {
+  border-radius: 0;
+}
+
+.segmented button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.segmented button:last-child {
+  margin-left: -1px;
+  border-radius: 0 6px 6px 0;
+}
+
+.views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+a.link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.stage {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.scene,
+.scene .cesium-viewer,
+.scene .cesium-widget,
+.scene .cesium-widget canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+  background: #070a0e;
+}
+
+/* Labels are drawn on a canvas of our own, laid exactly over the 3D view. */
+.label-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.scene-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+}
+
+/* Imagery credits (Cesium, Google) must stay visible: keep them clear of our own controls. */
+.scene .cesium-viewer-bottom {
+  left: 0.5rem;
+  bottom: 0.35rem;
+}
+
+.badges {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.6rem;
+  display: flex;
+  gap: 0.4rem;
+  pointer-events: none;
+}
+
+.badges .pill {
+  background: rgba(11, 15, 20, 0.8);
+}
+
+.notices {
+  position: absolute;
+  top: 0.6rem;
+  left: 50%;
+  display: grid;
+  gap: 0.4rem;
+  width: min(34rem, calc(100% - 2rem));
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.notice {
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--warn);
+  border-radius: 6px;
+  background: rgba(24, 20, 8, 0.92);
+  color: var(--text);
+}
+
+.selection {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  width: min(19rem, calc(100% - 1.2rem));
+  max-height: calc(100% - 1.2rem);
+  overflow-y: auto;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(18, 25, 34, 0.94);
+}
+
+.selection header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.selection h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.selection button.icon {
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.selection button.icon:hover {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.selection dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.2rem 0.75rem;
+  margin: 0.6rem 0;
+  font-size: 0.9rem;
+}
+
+.selection dt {
+  color: var(--muted);
+}
+
+.selection dd {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.selection button.primary {
+  width: 100%;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.selection button.primary:disabled {
+  border-color: var(--line);
+  color: var(--muted);
+  cursor: default;
+}
+
+.photo {
+  margin: 0.6rem 0 0;
+}
+
+.photo img {
+  display: block;
+  width: 100%;
+  border-radius: 6px;
+}
+
+.photo figcaption {
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.photo a {
+  color: inherit;
+}
+
+.attribution {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  padding: 0.25rem 0.75rem;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.attribution a {
+  color: inherit;
+}

@@ -42,6 +42,14 @@ export interface LiveClientOptions {
 const OPEN = 1;
 /** How many recent clock samples the server-time estimate looks at. */
 const CLOCK_SAMPLES = 20;
+/**
+ * The clock estimate changes as samples come and go. Applied at once, a change of 20 ms would move an
+ * aircraft on final by more than a metre between two frames, so the clock is slewed instead: it runs at
+ * most this much fast or slow until it has caught up.
+ */
+const CLOCK_SLEW = 0.02;
+/** A difference this large is not drift; it is a new connection or a changed clock. Jump to it. */
+const CLOCK_STEP_MS = 1500;
 
 /** `ws://` or `wss://` on the page's own host: the socket is always same-origin, so it survives a reverse proxy. */
 export function defaultSocketUrl(location: { protocol: string; host: string }): string {
@@ -62,6 +70,9 @@ export class LiveClient {
   private silenceTimer: ReturnType<typeof setTimeout> | null = null;
   private lastSeq: number | null = null;
   private clockOffsets: number[] = [];
+  /** The offset actually in use, which follows the estimate smoothly, and when it was last advanced. */
+  private appliedOffset: number | null = null;
+  private appliedAt = 0;
   private stopped = true;
 
   private readonly url: string;
@@ -113,9 +124,20 @@ export class LiveClient {
    * the one that travelled fastest and is the best estimate.
    */
   serverNow(): number {
-    return this.now() + this.clockOffset();
+    const now = this.now();
+    const target = this.clockOffset();
+    if (this.appliedOffset === null || Math.abs(target - this.appliedOffset) > CLOCK_STEP_MS) {
+      this.appliedOffset = target;
+    } else {
+      const allowance = Math.max(0, now - this.appliedAt) * CLOCK_SLEW;
+      const difference = target - this.appliedOffset;
+      this.appliedOffset += Math.max(-allowance, Math.min(allowance, difference));
+    }
+    this.appliedAt = now;
+    return now + this.appliedOffset;
   }
 
+  /** The current best estimate of server clock minus local clock, milliseconds. */
   clockOffset(): number {
     if (this.clockOffsets.length === 0) return 0;
     return Math.max(...this.clockOffsets);

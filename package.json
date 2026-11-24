@@ -19,10 +19,15 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "pnpm lint && pnpm typecheck && pnpm test",
-    "soak": "tsx scripts/soak.ts"
+    "soak": "tsx scripts/soak.ts",
+    "gen:models": "tsx scripts/gen-models.ts",
+    "probe": "tsx scripts/probe.ts",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.9",
+    "@gltf-transform/core": "4.5.1",
+    "@playwright/test": "1.65.1",
     "@types/node": "24.19.2",
     "tsx": "4.23.15",
     "typescript": "7.0.2",
