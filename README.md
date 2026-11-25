@@ -257,10 +257,10 @@ In development the server keeps its config and data in a gitignored `.local/` fo
 Set `CONFIG_DIR` and `DATA_DIR` to use other folders. Put tokens in `.env`, which is gitignored too.
 
 Tools for checking the scene in a real browser: `pnpm probe` (frame rate, screenshots), `pnpm verify:scene`
-(no jumps, no backward steps, wheels on the ground), `pnpm profile:phone` (what the scene costs on a slow device
-with a small screen), `pnpm soak` (30 minutes against the live sources, fails on any rate-limit answer) and
-`pnpm screenshots` (the pictures in this file). `pnpm check:types` checks the table of articles about aircraft
-types against ICAO and Wikipedia.
+(no jumps, no backward steps, wheels on the ground), `pnpm verify:surface` (in Photoreal, that the ground is where it
+is drawn), `pnpm profile:phone` (what the scene costs on a slow device with a small screen), `pnpm soak` (30 minutes
+against the live sources, fails on any rate-limit answer) and `pnpm screenshots` (the pictures in this file).
+`pnpm check:types` checks the table of articles about aircraft types against ICAO and Wikipedia.
 
 [docs/PLAN.md](docs/PLAN.md) is the build plan and [docs/DECISIONS.md](docs/DECISIONS.md) records every
 decision and every place where the app differs from the plan, including what could not be verified.
