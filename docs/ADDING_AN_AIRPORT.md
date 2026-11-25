@@ -40,6 +40,9 @@ airports:
     city: West Lafayette
     # lat, lon, elevationFt: the reference point and field elevation
 
+    # For the clock, sunrise and sunset in the side panel. Found from the position when left out.
+    timezone: America/Indiana/Indianapolis
+
     # Override the links in the side panel (liveatc, diagram, flightaware).
     links:
       liveatc: "https://www.liveatc.net/search/?icao=KLAF"
@@ -64,6 +67,13 @@ To add one by hand you need a position and an eye height. For US airports the FA
 lists control towers with surveyed positions and heights; that is where the values for KLAF and KIND in the
 example config come from. `heightM` is the height of the controllers' eyes above the ground, a little below
 the top of the structure. Mark it `approximate: true` unless you surveyed it.
+
+### The time zone
+
+The clock, sunrise and sunset in the side panel are in the airport's time zone, found from its position with a small
+table that can be wrong close to the border between two zones: of 32 US airports checked, many of them picked for being
+near one, KTEL was an hour out. If yours is, put its `timezone` in, by its
+[IANA name](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones). The sky does not depend on it.
 
 ### Ground traffic
 

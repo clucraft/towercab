@@ -150,6 +150,7 @@ describe('view presets', () => {
     available: true,
     geoidUndulationM: -34.32,
     elevationEllipsoidM: 150.39,
+    timezone: 'America/Indiana/Indianapolis',
     radiusNm: 6,
     ceilingFtAgl: 5000,
     tower,

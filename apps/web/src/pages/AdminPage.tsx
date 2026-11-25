@@ -502,6 +502,8 @@ function PoseEditor(props: {
               : 'schematic',
           view: 'overhead',
           quality: chooseQuality(readDeviceHints()),
+          // Poses are set against what the cameras see by day.
+          sky: 'day',
           callbacks: {
             onNotice: (text) => !cancelled && setProblem(text),
             // Nothing is lost by it here: drafts live in the page, not in the scene.

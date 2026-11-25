@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@fastify/static": "10.1.12",
+    "@photostructure/tz-lookup": "11.8.0",
     "better-sqlite3": "12.11.1",
     "egm96-universal": "1.1.1",
     "fastify": "5.12.8",

@@ -150,6 +150,8 @@ towercab/
 - [x] A picture of the aircraft type when there is no photo of the aircraft (D-074, D-075)
 - [x] Aircraft on the ground jumped 100 m up and back in Photoreal, and left spikes in their trails (D-076); a check
       that compares heights with what is drawn (D-077)
+- [x] The sky follows the sun over the airport, with local time, sunrise and sunset in the panel (D-078, D-079); no
+      more wall of rough tiles when the view turns (D-080)
 
 ### Not verified, for want of hardware, accounts or keys
 

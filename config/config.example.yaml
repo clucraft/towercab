@@ -5,6 +5,8 @@
 airports:
   # Only `icao` is required. Name, reference point, field elevation and runways are read from
   # OurAirports, and any value written here overrides that data (lat, lon, elevationFt, name, city).
+  # The time zone of the clock in the side panel comes from the position; close to the border between two zones
+  # it can be the neighbour's, and then `timezone: America/Indiana/Tell_City` (for instance) puts it right.
   - icao: KLAF
     radiusNm: 6 # geofence radius around the airport reference point
     ceilingFtAgl: 5000 # hide traffic above this height over the field

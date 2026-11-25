@@ -32,7 +32,8 @@ const root = join(import.meta.dirname, '..');
 const base = (values.url as string).replace(/\/+$/, '');
 const out = join(root, values.out as string);
 const airport = values.airport as string;
-const traffic = `replay=${values.replay}&mode=schematic`;
+// By day, whenever they are taken.
+const traffic = `replay=${values.replay}&mode=schematic&sky=day`;
 
 interface SceneHandle {
   layer: { list(): Iterable<{ hex: string; onGround: boolean; visible: boolean }> };

@@ -1,5 +1,16 @@
 import 'cesium/Build/Cesium/Widgets/widgets.css';
-import type { Aircraft, AirportDetail, CameraPose, ClientConfig, PublicCamera } from '@towercab/shared';
+import {
+  type Aircraft,
+  type AirportDetail,
+  type CameraPose,
+  type ClientConfig,
+  type DayPhase,
+  dayPhase,
+  type PublicCamera,
+  refractionDeg,
+  type SunPosition,
+  sunPosition,
+} from '@towercab/shared';
 import {
   BoundingSphere,
   Cartesian2,
@@ -37,6 +48,8 @@ import { LabelOverlay } from './labelOverlay';
 import { LayoutLayer } from './layoutLayer';
 import { SCHEMATIC } from './palette';
 import { DetailGovernor, PROFILES, type Quality, type QualityProfile } from './quality';
+import { DAY_SUN, LOWEST_LIGHT_DEG, type SkySetting, skyAt } from './sky';
+import { GroundLight, SkyDome } from './skyDome';
 import { hidePoorStandIn, type StandIn, tileProbe } from './tileSurface';
 import { TrailLayer } from './trails';
 import { buildViewPresets, resolveView, type ViewPreset } from './views';
@@ -72,6 +85,8 @@ export interface SceneOptions {
   view: string | null;
   /** How much the scene may cost. The default is `high`. */
   quality?: Quality;
+  /** What the sky does. The default is to follow the sun. */
+  sky?: SkySetting;
   callbacks?: SceneCallbacks;
 }
 
@@ -113,6 +128,11 @@ const CAMERA_CLEARANCE_M = 4;
 /** Where the surface under the 3D camera is not known, it may be this far below where it last was, metres. */
 const CAMERA_FALL_M = 5;
 
+/** How often the sky is brought up to date. The sun moves a twenty-fifth of a degree in this time. */
+const SKY_UPDATE_MS = 10_000;
+/** The Schematic map is dark, and its sky is dimmed to go with it. */
+const SCHEMATIC_SKY_DIM = 0.4;
+
 /** What the 3D view is doing when it looks through a camera. */
 interface Matched {
   id: string;
@@ -152,6 +172,13 @@ export class SceneController {
   private readonly callbacks: SceneCallbacks;
   private readonly unlisten: () => void;
   private readonly resizeObserver: ResizeObserver;
+
+  private readonly sky: SkyDome;
+  private readonly groundLight = new GroundLight();
+  private readonly light: DirectionalLight;
+  private skySetting: SkySetting;
+  private sun: SunPosition = DAY_SUN;
+  private lastSkyAt = Number.NEGATIVE_INFINITY;
 
   private airport: AirportDetail;
   private currentMode: SceneMode = 'schematic';
@@ -235,21 +262,16 @@ export class SceneController {
     scene.globe.baseColor = Color.fromCssColorString(SCHEMATIC.ground);
     scene.globe.depthTestAgainstTerrain = true;
     scene.fog.enabled = false;
+    // The sky is our own: see `sky.ts`. Cesium draws the stars and the moon behind it.
     if (scene.sun) scene.sun.show = false;
-    if (scene.moon) scene.moon.show = false;
+    if (scene.skyAtmosphere) scene.skyAtmosphere.show = false;
+    this.viewer.clock.shouldAnimate = false;
+    this.skySetting = options.sky ?? 'real';
+    this.sky = new SkyDome(scene);
+    this.light = new DirectionalLight({ direction: new Cartesian3(0, 0, -1) });
+    scene.light = this.light;
     scene.screenSpaceCameraController.minimumZoomDistance = 4;
     scene.screenSpaceCameraController.maximumZoomDistance = 120_000;
-    // A fixed light from high in the south-west, so aircraft look the same at any hour.
-    const frame = Transforms.eastNorthUpToFixedFrame(Cartesian3.fromDegrees(airport.lon, airport.lat, 0));
-    const direction = Matrix4.multiplyByPointAsVector(
-      frame,
-      new Cartesian3(0.35, 0.3, -0.89),
-      new Cartesian3(),
-    );
-    scene.light = new DirectionalLight({
-      direction: Cartesian3.normalize(direction, direction),
-      intensity: 2.6,
-    });
 
     this.layout = new LayoutLayer(this.viewer, () => this.terrain === null);
     this.layer = new EntityAircraftLayer(this.viewer);
@@ -376,10 +398,9 @@ export class SceneController {
     if (this.tileset) this.tileset.show = photoreal;
     scene.globe.show = !photoreal;
     this.layout.show = !photoreal;
-    if (scene.skyAtmosphere) scene.skyAtmosphere.show = photoreal;
-    if (scene.skyBox) scene.skyBox.show = photoreal;
     scene.globe.showGroundAtmosphere = false;
     scene.backgroundColor = Color.fromCssColorString(SCHEMATIC.sky);
+    this.updateSky();
 
     this.applyGround();
     this.cones.rebuild();
@@ -391,6 +412,17 @@ export class SceneController {
     if (this.matched) this.placeAtCamera(this.matched.id, false);
     scene.requestRender();
     this.callbacks.onMode?.(mode);
+  }
+
+  /** Makes the sky follow the sun, stay as by day, or show a fixed moment. */
+  setSky(setting: SkySetting): void {
+    this.skySetting = setting;
+    this.updateSky();
+  }
+
+  /** Where the sun is as drawn, and what part of the day that is. For the panel, tests and the console. */
+  get skyState(): SunPosition & { phase: DayPhase; setting: SkySetting } {
+    return { ...this.sun, phase: dayPhase(this.sun.elevationDeg), setting: this.skySetting };
   }
 
   /** Moves the camera to a preset. */
@@ -788,6 +820,7 @@ export class SceneController {
       }
     }
 
+    if (now - this.lastSkyAt >= SKY_UPDATE_MS) this.updateSky();
     if (this.ground instanceof ProbedGround) this.ground.beginFrame(elapsed);
     const { store, config } = this.options;
     const renderTime = store.serverNow() - (store.renderDelayMs() ?? config.renderDelayMs);
@@ -815,6 +848,7 @@ export class SceneController {
    * (`debugFreezeFrame` does exactly this; despite its name it is a public property of the tileset.)
    */
   private onBeforeRender = (): void => {
+    this.sky.follow(this.viewer.camera);
     const tileset = this.tileset;
     if (!tileset) return;
     const { camera, canvas } = this.viewer.scene;
@@ -955,6 +989,46 @@ export class SceneController {
     this.select(hex);
   }
 
+  // ---- sky ------------------------------------------------------------------------------------------
+
+  /** Puts the sun where it is over the airport right now, and the sky, the ground and the light with it. */
+  private updateSky(): void {
+    if (this.destroyed) return;
+    this.lastSkyAt = performance.now();
+    const { airport, skySetting } = this;
+    const { scene, clock } = this.viewer;
+    const time = typeof skySetting === 'number' ? skySetting : this.options.store.serverNow();
+    this.sun = skySetting === 'day' ? DAY_SUN : sunPosition(airport.lat, airport.lon, time);
+    // The stars and the moon go by Cesium's clock.
+    clock.currentTime = JulianDate.fromDate(new Date(time));
+
+    const { elevationDeg, azimuthDeg } = this.sun;
+    const look = skyAt(elevationDeg);
+    const frame = Transforms.eastNorthUpToFixedFrame(Cartesian3.fromDegrees(airport.lon, airport.lat, 0));
+    const towards = (elevation: number): Cartesian3 => {
+      const el = CesiumMath.toRadians(elevation);
+      const az = CesiumMath.toRadians(azimuthDeg);
+      const local = new Cartesian3(Math.cos(el) * Math.sin(az), Math.cos(el) * Math.cos(az), Math.sin(el));
+      return Matrix4.multiplyByPointAsVector(frame, local, local);
+    };
+    const photoreal = this.currentMode === 'photoreal';
+    this.sky.set(
+      look,
+      towards(elevationDeg + refractionDeg(elevationDeg)),
+      Matrix4.multiplyByPointAsVector(frame, Cartesian3.UNIT_Z, new Cartesian3()),
+      photoreal ? 1 : SCHEMATIC_SKY_DIM,
+    );
+    const stars = photoreal && look.opacity < 1;
+    if (scene.skyBox) scene.skyBox.show = stars;
+    if (scene.moon) scene.moon.show = stars;
+    this.groundLight.set(look);
+
+    Cartesian3.negate(towards(Math.max(elevationDeg, LOWEST_LIGHT_DEG)), this.light.direction);
+    this.light.color = new Color(...look.light);
+    this.light.intensity = look.lightIntensity;
+    scene.requestRender();
+  }
+
   // ---- follow camera --------------------------------------------------------------------------------
 
   private updateFollow(): void {
@@ -1041,6 +1115,7 @@ export class SceneController {
       tileset.destroy();
       return;
     }
+    tileset.customShader = this.groundLight.shader;
     this.tileset = this.viewer.scene.primitives.add(tileset) as Cesium3DTileset;
 
     this.tilesWaitMs = 0;

@@ -194,6 +194,86 @@ test('the side panel lists the traffic, the weather hint and the sources', async
   await expect(panel).toBeVisible();
 });
 
+test('the sky follows the sun over the airport, and the panel has its local times', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (err) => errors.push(err.message));
+  await mockBackend(page);
+  const sky = () => page.evaluate(() => window.__towercab?.skyState);
+
+  // Half an hour after sunset in Indiana.
+  await page.goto('/KLAF?sky=2026-11-25T22:50Z');
+  await expect(page.getByTestId('airport-page')).toHaveAttribute('data-ready', 'true', { timeout: 60_000 });
+  const daylight = page.getByTestId('daylight');
+  await expect(daylight).toContainText('17:50 EST');
+  await expect(daylight).toContainText('07:45');
+  await expect(daylight).toContainText('17:24');
+  await expect(daylight).toContainText('Civil twilight');
+  await expect(daylight).toContainText('November 25, 2026');
+  expect(await sky()).toMatchObject({ phase: 'civil' });
+
+  // The sky is nowhere: were it somewhere, zooming over it would throw the camera a long way.
+  await page.getByTestId('view-tower').click();
+  await page.waitForTimeout(2500);
+  const pointedAt = await page.evaluate(() => {
+    interface Vec {
+      x: number;
+      y: number;
+      z: number;
+    }
+    interface Inside {
+      viewer: {
+        camera: {
+          position: { constructor: new (x: number, y: number, z: number) => Vec };
+          getPickRay(at: { x: number; y: number }): { origin: Vec; direction: Vec };
+        };
+        scene: {
+          canvas: { clientWidth: number; clientHeight: number };
+          cartesianToCanvasCoordinates(v: Vec): { x: number; y: number };
+          pickPosition(at: { x: number; y: number }): Vec | undefined;
+        };
+      };
+    }
+    const { camera, scene } = (window.__towercab as unknown as Inside).viewer;
+    const { clientWidth, clientHeight } = scene.canvas;
+    const at = (y: number) => {
+      const { origin: o, direction: d } = camera.getPickRay({ x: clientWidth / 2, y: clientHeight * y });
+      const Vec = camera.position.constructor;
+      const ahead = new Vec(o.x + d.x * 100, o.y + d.y * 100, o.z + d.z * 100);
+      return scene.pickPosition(scene.cartesianToCanvasCoordinates(ahead)) !== undefined;
+    };
+    return { sky: at(0.05), ground: at(0.9) };
+  });
+  expect(pointedAt).toEqual({ sky: false, ground: true });
+
+  // Back to now, whatever that is here: the sun as drawn is where it is.
+  await daylight.getByRole('button', { name: 'Back to now' }).click();
+  await expect(page).not.toHaveURL(/sky=/);
+  await expect.poll(async () => (await sky())?.setting).toBe('real');
+
+  // Always day, and remembered.
+  await page.getByTestId('sky-toggle').uncheck();
+  expect(await sky()).toMatchObject({ phase: 'day', setting: 'day' });
+  await page.reload();
+  await expect(page.getByTestId('airport-page')).toHaveAttribute('data-ready', 'true', { timeout: 60_000 });
+  expect(await sky()).toMatchObject({ setting: 'day' });
+  await page.getByTestId('sky-toggle').check();
+  expect(await sky()).toMatchObject({ setting: 'real' });
+  expect(errors).toEqual([]);
+});
+
+test.describe('for a viewer in another time zone', () => {
+  test.use({ timezoneId: 'Asia/Tokyo' });
+
+  test('the times are the airport’s', async ({ page }) => {
+    await mockBackend(page);
+    await page.goto('/KLAF?sky=2026-11-25T22:50Z');
+    await expect(page.getByTestId('airport-page')).toHaveAttribute('data-ready', 'true', { timeout: 60_000 });
+    expect(await page.evaluate(() => new Date(Date.UTC(2026, 10, 25, 22, 50)).getHours())).toBe(7);
+    await expect(page.getByTestId('daylight')).toContainText('17:50 EST');
+    await expect(page.getByTestId('daylight')).toContainText('November 25, 2026');
+  });
+});
+
 test('a recording plays back without the live feed', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (err) => errors.push(err.message));

@@ -714,3 +714,48 @@ is drawn at a pixel and the lookup how high that point is; then it moves the cam
 stray. It agrees to a centimetre at KLAF and KIND. Two traps on the way there: `pickPosition` remembers its answers by the
 text of the position it is given, which is the same for every plain object; and with antialiasing the depth of a
 pixel can be that of something at its edge.
+
+### D-078 The sky is our own, and follows the sun
+
+Asked for on 2026-11-25: day and night by the airport's real sunrise and sunset. Where the sun is depends on the
+coordinates and the moment only (`packages/shared/src/sun.ts`, NOAA's equations), so no time zone is involved until
+a time is shown. Checked against JPL Horizons at six airports, polar day and night included: within 0.02 degrees and
+half a minute. (The US Naval Observatory, the first choice, could not be reached.) The sun is drawn with refraction, so it
+touches the horizon when the panel says it sets.
+
+Cesium can light its own sky by the sun. It was tried first: with the sun on the horizon the sky is brown and the
+stars are out, and twenty minutes later it is all but black, because the model knows only light scattered once. So the sky is a
+sphere around the camera with a small shader, and nine sets of colours by the height of the sun, blended in between
+(`sky.ts`, `skyDome.ts`). Cesium still draws the stars and the moon behind it, from its clock.
+
+- Google's tiles are unlit pictures taken by day. A custom shader dims them and takes out some colour; at night to about a
+  third, which is brighter than true so that the field can be read. One shader for every hour, because
+  putting one on prepares all tiles anew.
+- The aircraft are lit from the side the sun is on, never from lower than 22 degrees, and at night a little brighter than
+  the ground.
+- Schematic shows the same sky at 40 percent, without stars. The map was made to be dark.
+- Cesium makes opaque materials write depth whatever the render state says. The sky was then 20,000 km away instead of
+  nowhere, and a notch of the wheel over it moved the camera 1.1 km instead of 260 m. Its render state is set behind
+  Cesium's back, and a browser test asks what is under the mouse in the sky.
+- The weather is not in it. An overcast sky would need clouds that are right, not just grey.
+- The admin page keeps it day: poses are set against what cameras see.
+
+Cost: none that could be measured (phone stand-in 31 frames a second before and after, at noon, dusk and night; turning 30
+instead of 28.5; a desktop 60).
+
+### D-079 Time zones from a small table (Deviation)
+
+The clock in the panel needs the airport's zone. `geo-tz` is exact and adds 73 MB to the image; `@photostructure/tz-lookup`
+has 88 KB and says itself that it is wrong for about one inhabited place in twenty. Against the National Weather Service's
+zone for 32 US airports, many chosen for being near a border between zones: `geo-tz` agreed on all (one by another name
+for the same time), `tz-lookup` on all but KTEL, an hour out. The small one, then, with `timezone` in the config to put
+it right. Nothing else depends on it.
+
+### D-080 Poor stand-ins among Google's tiles are hidden (Fix)
+
+With `skipLevelOfDetail` (D-073), turning the view in the tower brought up the rough tiles of wherever it turned to until the
+right ones came: a grey wall across the sky for 0.3 to 2 seconds, every time. Tiles of more than 300 m of error that
+also have more than 30 times the error allowed on the screen are not drawn now. Nothing else showed a hole: the ground
+below the horizon stayed covered from 60 m to 60 km up, settled and turning, at KLAF and KIND. (Loading only tiles of the
+wanted detail, a public option, left one wall in five. Without `skipLevelOfDetail` there is none, and the blur of D-073
+is back.) It uses the tile's model and screen error, which are not public; without them it does nothing.

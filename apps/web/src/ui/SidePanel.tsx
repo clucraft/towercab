@@ -10,6 +10,8 @@ import {
   type ProviderHealth,
   rankRunwaysByWind,
 } from '@towercab/shared';
+import type { SkySetting } from '../scene/sky';
+import { Daylight } from './Daylight';
 
 interface Props {
   airport: AirportDetail;
@@ -18,6 +20,9 @@ interface Props {
   metar: Metar | null;
   /** The server's clock, for data ages. */
   now: number;
+  /** What the sky does. */
+  sky: SkySetting;
+  onSky(sky: SkySetting): void;
   /** "replay" or "simulated" when the traffic is not live. */
   feedLabel: string | null;
   selected: string | null;
@@ -163,6 +168,8 @@ export function SidePanel({
   status,
   metar,
   now,
+  sky,
+  onSky,
   feedLabel,
   selected,
   onSelect,
@@ -220,6 +227,11 @@ export function SidePanel({
           </p>
         )}
         <Weather airport={airport} metar={metar} now={now} />
+      </details>
+
+      <details open>
+        <summary>Daylight</summary>
+        <Daylight airport={airport} now={now} sky={sky} onSky={onSky} />
       </details>
 
       <details open>

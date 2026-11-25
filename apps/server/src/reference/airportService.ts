@@ -12,6 +12,7 @@ import {
 import { geoidUndulationM } from './geoid';
 import type { AirportRecord } from './ourairports';
 import { findTower } from './overpass';
+import { timeZoneAt } from './timeZone';
 
 /** Eye level in a tower cab sits a little below the top of the structure OSM gives the height of. */
 const CAB_BELOW_TOP_M = 3;
@@ -65,6 +66,7 @@ export function buildAirportInfo(
     available: true,
     geoidUndulationM: Math.round(undulation * 100) / 100,
     elevationEllipsoidM: Math.round(fieldElevationEllipsoidM(elevationFt, undulation) * 100) / 100,
+    timezone: entry.timezone ?? timeZoneAt(lat, lon),
     radiusNm: entry.radiusNm,
     ceilingFtAgl: entry.ceilingFtAgl,
     tower,

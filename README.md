@@ -166,11 +166,23 @@ Add these to an airport's address:
 | `?replay=klaf-pattern` | Play a recording instead of live traffic.                                   |
 | `?sim=150`             | Show that many simulated aircraft instead of live traffic.                  |
 | `?quality=lite`        | Draw Photoreal with less detail, or with more: `high`. [Phones](#phones)    |
+| `?sky=day`             | Keep it day, or show a moment. [Day and night](#day-and-night)              |
 | `?fps`                 | Show the frame rate.                                                        |
 
 `/debug/KLAF` shows the same traffic as a table with source health, `/admin` is the
 [admin page](docs/ADDING_A_CAMERA.md#the-admin-page), `/healthz` is the health check and `/metrics` has
 Prometheus metrics.
+
+### Day and night
+
+The sky follows the real sun over the airport: its height and direction are worked out from the airport's
+coordinates and the time, so it is right wherever you watch from. The sun sets where and when it does there; then
+come the colours of dusk, the stars and the moon. In Photoreal the ground goes dark with it, though never so dark
+that you cannot see a taxiway: Google's pictures were taken by day, and are dimmed. It is always a clear sky.
+Schematic keeps its dark map under a dimmed sky.
+
+The side panel has the local time, sunrise and sunset in the airport's time zone, and a switch to keep it day, which
+the browser remembers. `?sky=2026-11-25T22:20Z` shows the sky of any moment, for a look at the evening in the morning.
 
 ### Phones
 

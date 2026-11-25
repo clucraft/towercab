@@ -47,6 +47,8 @@ export interface AirportInfo extends AirportSummary {
   geoidUndulationM: number;
   /** Field elevation as a height above the WGS84 ellipsoid, metres. */
   elevationEllipsoidM: number;
+  /** IANA time zone, for the local times that are shown. */
+  timezone: string;
   radiusNm: number;
   ceilingFtAgl: number;
   tower: AirportTower | null;

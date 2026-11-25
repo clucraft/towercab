@@ -17,6 +17,7 @@ export const AIRPORT = {
   available: true,
   geoidUndulationM: -34.32,
   elevationEllipsoidM: 150.39,
+  timezone: 'America/Indiana/Indianapolis',
   radiusNm: 6,
   ceilingFtAgl: 5000,
   tower: { lat: 40.414761, lon: -86.933297, heightM: 23, approximate: true, source: 'config' },
@@ -279,6 +280,7 @@ export async function mockBackend(
 }
 
 export interface SceneHandle {
+  skyState: { phase: string; setting: string | number; elevationDeg: number };
   stats(): { aircraft: number; mode: string };
   drawn(
     hex: string,

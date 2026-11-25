@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AirportEntrySchema, distanceM } from '@towercab/shared';
+import { AirportEntrySchema, distanceM, isTimeZone } from '@towercab/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildAirportInfo, defaultLinks } from '../src/reference/airportService';
 import { geoidUndulationM } from '../src/reference/geoid';
@@ -16,6 +16,7 @@ import {
   overpassToLayout,
 } from '../src/reference/overpass';
 import { PhotoService, parsePhotoResponse } from '../src/reference/photos';
+import { timeZoneAt } from '../src/reference/timeZone';
 import { fakeFetch, fixtureJson, fixtureText, sentHeaders, upstreamRoutes } from './helpers';
 
 const UA = 'TowerCab-tests/0 (+https://example.test)';
@@ -532,6 +533,34 @@ describe('Overpass layout', () => {
   });
 });
 
+describe('timeZoneAt', () => {
+  // Each of these checked against the US National Weather Service (api.weather.gov/points) on 2026-11-25.
+  it.each([
+    ['KLAF', 40.412875, -86.939363, 'America/Indiana/Indianapolis'],
+    ['KIND', 39.7173, -86.294403, 'America/Indiana/Indianapolis'],
+    ['KGYY, in the part of Indiana that goes by Chicago', 41.617087, -87.413206, 'America/Chicago'],
+    ['KEVV, in the other such part', 38.0369987488, -87.5324020386, 'America/Chicago'],
+    ['KPHX, without summer time', 33.435302, -112.005905, 'America/Phoenix'],
+    ['PANC', 61.179004, -149.992561, 'America/Anchorage'],
+  ])('%s', (_name, lat, lon, zone) => {
+    expect(timeZoneAt(lat, lon)).toBe(zone);
+  });
+
+  it('gives a zone that can be used, whatever the position', () => {
+    for (let lat = -90; lat <= 90; lat += 15) {
+      for (let lon = -180; lon <= 180; lon += 15) expect(isTimeZone(timeZoneAt(lat, lon))).toBe(true);
+    }
+    expect(timeZoneAt(Number.NaN, 0)).toBe('UTC');
+    expect(timeZoneAt(200, 0)).toBe('UTC');
+  });
+
+  it('can be overridden in the config, with a name that exists', () => {
+    const entry = (timezone: string) => AirportEntrySchema.safeParse({ icao: 'KTEL', timezone });
+    expect(entry('America/Indiana/Tell_City').success).toBe(true);
+    expect(entry('Central').success).toBe(false);
+  });
+});
+
 describe('buildAirportInfo', () => {
   const record = {
     ident: 'KLAF',
@@ -557,6 +586,7 @@ describe('buildAirportInfo', () => {
       radiusNm: 6,
       ceilingFtAgl: 5000,
       defaultView: 'tower',
+      timezone: 'America/Indiana/Indianapolis',
       tower: null,
       available: true,
       sources: { airport: 'ourairports', layout: null, layoutFetchedAt: null },
@@ -574,6 +604,7 @@ describe('buildAirportInfo', () => {
         lat: 40.5,
         elevationFt: 610,
         radiusNm: 9,
+        timezone: 'America/Chicago',
         links: { diagram: 'https://example.test/laf.pdf' },
         tower: { lat: 40.41, lon: -86.94, heightM: 18, approximate: false },
       }),
@@ -582,6 +613,7 @@ describe('buildAirportInfo', () => {
       null,
     );
     expect(info).toMatchObject({ name: 'LAF', lat: 40.5, lon: -86.939363, elevationFt: 610, radiusNm: 9 });
+    expect(info?.timezone).toBe('America/Chicago');
     expect(info?.tower).toEqual({
       lat: 40.41,
       lon: -86.94,

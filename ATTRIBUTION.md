@@ -55,16 +55,21 @@ the sources you enable.
 
 The main libraries, all installed from npm at the versions in `pnpm-lock.yaml`:
 
-| Library                                                                | Licence    |
-| ---------------------------------------------------------------------- | ---------- |
-| [CesiumJS](https://github.com/CesiumGS/cesium)                         | Apache-2.0 |
-| [hls.js](https://github.com/video-dev/hls.js)                          | Apache-2.0 |
-| [React](https://react.dev)                                             | MIT        |
-| [Fastify](https://fastify.dev), [ws](https://github.com/websockets/ws) | MIT        |
-| [better-sqlite3](https://github.com/WiseLibs/better-sqlite3)           | MIT        |
-| [egm96-universal](https://www.npmjs.com/package/egm96-universal)       | MIT        |
-| [zod](https://zod.dev), [pino](https://getpino.io)                     | MIT        |
-| [yaml](https://eemeli.org/yaml/)                                       | ISC        |
+| Library                                                                  | Licence    |
+| ------------------------------------------------------------------------ | ---------- |
+| [CesiumJS](https://github.com/CesiumGS/cesium)                           | Apache-2.0 |
+| [hls.js](https://github.com/video-dev/hls.js)                            | Apache-2.0 |
+| [React](https://react.dev)                                               | MIT        |
+| [Fastify](https://fastify.dev), [ws](https://github.com/websockets/ws)   | MIT        |
+| [better-sqlite3](https://github.com/WiseLibs/better-sqlite3)             | MIT        |
+| [egm96-universal](https://www.npmjs.com/package/egm96-universal)         | MIT        |
+| [@photostructure/tz-lookup](https://github.com/photostructure/tz-lookup) | CC0-1.0    |
+| [zod](https://zod.dev), [pino](https://getpino.io)                       | MIT        |
+| [yaml](https://eemeli.org/yaml/)                                         | ISC        |
+
+tz-lookup's table of time zones is made from
+[timezone-boundary-builder](https://github.com/evansiroky/timezone-boundary-builder), which is made from OpenStreetMap
+(© OpenStreetMap contributors, ODbL 1.0). The stars are the picture that comes with CesiumJS.
 
 Optional companions, run as their own containers and not part of TowerCab's image:
 [go2rtc](https://github.com/AlexxIT/go2rtc) (MIT),

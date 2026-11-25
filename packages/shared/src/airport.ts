@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isTimeZone } from './sun';
 
 /** ICAO location indicator, e.g. `KLAF`. Accepts lower case and normalises to upper case. */
 export const IcaoSchema = z
@@ -40,6 +41,11 @@ export const AirportEntrySchema = z.object({
   lat: LatSchema.optional(),
   lon: LonSchema.optional(),
   elevationFt: z.number().min(-1500).max(20000).optional(),
+  /** IANA time zone, for the local times that are shown. Worked out from the position when left out. */
+  timezone: z
+    .string()
+    .refine(isTimeZone, 'expected a time zone name such as America/Indiana/Indianapolis')
+    .optional(),
   /** Geofence radius around the reference point. */
   radiusNm: z.number().positive().max(40).default(6),
   /** Geofence ceiling above field elevation. */

@@ -7,4 +7,5 @@ export * from './camera';
 export * from './geo';
 export * from './messages';
 export * from './metar';
+export * from './sun';
 export * from './typeArticles';

@@ -7,6 +7,7 @@ import { type FeedFactory, LiveStore, webSocketFeed } from '../live/store';
 import { navigate, setQuery, useLocation } from '../router';
 import { chooseQuality, readDeviceHints } from '../scene/quality';
 import type { SceneController, SceneFailure, SceneMode, SceneStats } from '../scene/SceneController';
+import { parseSky, type SkySetting, savedSky, saveSky } from '../scene/sky';
 import { buildViewPresets, viewForShortcut } from '../scene/views';
 import { simFeed } from '../sim/simFeed';
 import { SelectionPanel } from '../ui/SelectionPanel';
@@ -109,6 +110,7 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
   const [view, setView] = useState<string>(initial.get('view') ?? airport.defaultView);
   const [selected, setSelected] = useState<string | null>(null);
   const [trails, setTrails] = useState(true);
+  const [sky, setSky] = useState<SkySetting>(() => parseSky(initial.get('sky')) ?? savedSky());
   const [panelOpen, setPanelOpen] = useState(() => !window.matchMedia(SMALL_SCREEN).matches);
   const [metar, setMetar] = useState<Metar | null>(null);
   const [cameras, setCameras] = useState<PublicCamera[]>([]);
@@ -133,8 +135,8 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
   }, []);
 
   // What a scene built again should come back to. Read when it is built, not a reason to build it.
-  const wanted = useRef({ mode, view, selected, trails });
-  wanted.current = { mode, view, selected, trails };
+  const wanted = useRef({ mode, view, selected, trails, sky });
+  wanted.current = { mode, view, selected, trails, sky };
 
   useEffect(() => {
     store.start();
@@ -184,6 +186,7 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
           mode: wanted.current.mode,
           view: wanted.current.view,
           quality,
+          sky: wanted.current.sky,
           // A scene that was discarded before it finished starting must not report back.
           callbacks: {
             onSelect: (hex) => {
@@ -349,6 +352,12 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
   }, [showFps]);
 
   const changeMode = useCallback((next: SceneMode) => void sceneRef.current?.setMode(next), []);
+  const changeSky = useCallback((next: SkySetting) => {
+    setSky(next);
+    saveSky(next);
+    setQuery({ sky: null });
+    sceneRef.current?.setSky(next);
+  }, []);
   const changeView = useCallback((id: string) => sceneRef.current?.setView(id), []);
   const select = useCallback((hex: string | null) => sceneRef.current?.select(hex), []);
 
@@ -494,6 +503,8 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
             status={store.status}
             metar={metar}
             now={now}
+            sky={sky}
+            onSky={changeSky}
             feedLabel={feed.label}
             selected={selected}
             onSelect={(hex) => select(hex)}
