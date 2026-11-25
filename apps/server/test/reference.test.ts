@@ -82,6 +82,7 @@ describe('OurAirports', () => {
       lon: -86.939363,
       elevationFt: 606,
       municipality: 'West Lafayette',
+      country: 'US',
     });
     expect(found.get('KIND')).toMatchObject({
       name: 'Indianapolis International Airport',
@@ -570,6 +571,7 @@ describe('buildAirportInfo', () => {
     lon: -86.939363,
     elevationFt: 606,
     municipality: 'West Lafayette',
+    country: 'US',
   };
   const entry = (extra: object = {}) =>
     AirportEntrySchema.parse({ icao: 'KLAF', defaultView: 'tower', ...extra });
@@ -594,7 +596,20 @@ describe('buildAirportInfo', () => {
     // 606 ft is 184.7 m above sea level; the ellipsoid is about 34 m higher than the geoid here.
     expect(info?.geoidUndulationM).toBeCloseTo(-34.3, 0);
     expect(info?.elevationEllipsoidM).toBeCloseTo(184.71 + (info?.geoidUndulationM ?? 0), 1);
-    expect(info?.links).toEqual(defaultLinks('KLAF'));
+    expect(info?.links).toEqual(defaultLinks('KLAF', 'US'));
+    expect(info?.links.diagram).toContain('faa.gov');
+  });
+
+  it('links to the FAA only where the FAA has diagrams', () => {
+    const changi = { ...record, ident: 'WSSS', country: 'SG' };
+    expect(buildAirportInfo(entry({ icao: 'WSSS' }), changi, [], null)?.links).toEqual({
+      liveatc: 'https://www.liveatc.net/search/?icao=WSSS',
+      flightaware: 'https://www.flightaware.com/live/airport/WSSS',
+    });
+    const own = entry({ icao: 'WSSS', links: { diagram: 'https://example.test/wsss.pdf' } });
+    expect(buildAirportInfo(own, changi, [], null)?.links.diagram).toBe('https://example.test/wsss.pdf');
+    expect(defaultLinks('TJSJ', 'PR').diagram).toContain('faa.gov');
+    expect(defaultLinks('XXXX').diagram).toBeUndefined();
   });
 
   it('lets config override any value', () => {

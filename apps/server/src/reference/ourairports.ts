@@ -20,6 +20,8 @@ export interface AirportRecord {
   lon: number;
   elevationFt: number | null;
   municipality: string | null;
+  /** ISO 3166 code, e.g. `US`. */
+  country: string | null;
 }
 
 /**
@@ -116,6 +118,7 @@ export function findAirports(csv: string, icaos: Iterable<string>): Map<string, 
         'longitude_deg',
         'elevation_ft',
         'municipality',
+        'iso_country',
         'icao_code',
         'gps_code',
       ]);
@@ -139,6 +142,7 @@ export function findAirports(csv: string, icaos: Iterable<string>): Map<string, 
       lon,
       elevationFt: number(cell('elevation_ft')),
       municipality: cell('municipality')?.trim() || null,
+      country: cell('iso_country')?.trim() || null,
     });
     return true;
   });

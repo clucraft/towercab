@@ -53,7 +53,8 @@ export interface AirportInfo extends AirportSummary {
   ceilingFtAgl: number;
   tower: AirportTower | null;
   runways: Runway[];
-  links: Required<AirportLinks>;
+  /** There is no diagram where none is known. */
+  links: Required<Omit<AirportLinks, 'diagram'>> & Pick<AirportLinks, 'diagram'>;
   /** Where the reference data came from, for the attribution footer. */
   sources: {
     airport: 'ourairports' | 'config';

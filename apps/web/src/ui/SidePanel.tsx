@@ -259,11 +259,14 @@ export function SidePanel({
               LiveATC: listen to {airport.icao}
             </a>
           </li>
-          <li>
-            <a href={airport.links.diagram} target="_blank" rel="noreferrer noopener">
-              FAA airport diagram
-            </a>
-          </li>
+          {airport.links.diagram && (
+            <li>
+              <a href={airport.links.diagram} target="_blank" rel="noreferrer noopener">
+                {new URL(airport.links.diagram).hostname.endsWith('faa.gov') ? 'FAA airport' : 'Airport'}{' '}
+                diagram
+              </a>
+            </li>
+          )}
           <li>
             <a href={airport.links.flightaware} target="_blank" rel="noreferrer noopener">
               FlightAware: {airport.icao} arrivals and departures

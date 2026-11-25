@@ -17,12 +17,17 @@ import { timeZoneAt } from './timeZone';
 /** Eye level in a tower cab sits a little below the top of the structure OSM gives the height of. */
 const CAB_BELOW_TOP_M = 3;
 
-export function defaultLinks(icao: string): Required<NonNullable<AirportEntry['links']>> {
+/** Where the FAA publishes airport diagrams: the states and the territories, by ISO code. */
+const FAA_COUNTRIES = new Set(['US', 'PR', 'VI', 'GU', 'AS', 'MP']);
+
+export function defaultLinks(icao: string, country?: string | null): AirportInfo['links'] {
   return {
     liveatc: `https://www.liveatc.net/search/?icao=${icao}`,
     // The FAA has no stable per-airport diagram URL (the path changes every 28-day cycle), so this is the
     // search page. Put a direct link in config to override it.
-    diagram: 'https://www.faa.gov/airports/runway_safety/diagrams/',
+    ...(country && FAA_COUNTRIES.has(country)
+      ? { diagram: 'https://www.faa.gov/airports/runway_safety/diagrams/' }
+      : {}),
     flightaware: `https://www.flightaware.com/live/airport/${icao}`,
   };
 }
@@ -71,7 +76,7 @@ export function buildAirportInfo(
     ceilingFtAgl: entry.ceilingFtAgl,
     tower,
     runways,
-    links: { ...defaultLinks(entry.icao), ...entry.links },
+    links: { ...defaultLinks(entry.icao, record?.country), ...entry.links },
     sources: {
       airport: record ? 'ourairports' : 'config',
       layout: layout && layout.features.length > 0 ? 'osm' : null,
