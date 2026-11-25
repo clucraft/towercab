@@ -70,7 +70,7 @@ example config come from. `heightM` is the height of the controllers' eyes above
 the top of the structure. Mark it `approximate: true` unless you surveyed it.
 
 Look at the result in Photoreal. Where Google has the tower in 3D, the camera can end up inside it, with walls all
-around: raise `heightM` a few metres above the structure, as for KMDW below.
+around: raise `heightM` a few metres above the structure, as for KMDW and KDTW below.
 
 ### Airports that were tried
 
@@ -93,6 +93,14 @@ Singapore's comes from OpenStreetMap.
   radiusNm: 10
   ceilingFtAgl: 6000
   tower: { lat: 39.862428, lon: -104.673633, heightM: 96, approximate: true }
+  defaultView: tower
+- icao: KDTW # Detroit. OAS 26-001770, 238 ft AGL; up to 70 m the camera is inside the tower
+  radiusNm: 8
+  ceilingFtAgl: 6000
+  tower: { lat: 42.212722, lon: -83.35435, heightM: 76, approximate: true }
+  defaultView: tower
+- icao: KLAN # Lansing. OAS 26-025131, 83 ft AGL
+  tower: { lat: 42.775142, lon: -84.589447, heightM: 23, approximate: true }
   defaultView: tower
 - icao: WSSS # Singapore Changi. Google has flat pictures there, without buildings
   radiusNm: 8
