@@ -37,7 +37,7 @@ import { LabelOverlay } from './labelOverlay';
 import { LayoutLayer } from './layoutLayer';
 import { SCHEMATIC } from './palette';
 import { DetailGovernor, PROFILES, type Quality, type QualityProfile } from './quality';
-import { tileProbe } from './tileSurface';
+import { hidePoorStandIn, type StandIn, tileProbe } from './tileSurface';
 import { TrailLayer } from './trails';
 import { buildViewPresets, resolveView, type ViewPreset } from './views';
 
@@ -1046,6 +1046,9 @@ export class SceneController {
     this.tilesWaitMs = 0;
     tileset.initialTilesLoaded.addEventListener(() => {
       this.tilesWaitMs = null;
+    });
+    tileset.tileVisible.addEventListener((tile: StandIn) => {
+      hidePoorStandIn(tile, tileset.maximumScreenSpaceError);
     });
     tileset.allTilesLoaded.addEventListener(() => {
       // What is on screen has just become finer; heights read from the coarser tiles are out of date.

@@ -35,6 +35,31 @@ const START_ABOVE_M = 2000;
 /** At its edges the surface of a tile reaches a little past the tile's box (0.05 percent was seen). */
 const BOX_SLACK = 1.02;
 
+/** A tile that stands in for finer ones, as it is known to Cesium. Not part of its public interface either. */
+export interface StandIn {
+  readonly geometricError: number;
+  /** How many pixels that error is, seen from where the camera is. */
+  readonly _screenSpaceError?: number;
+  readonly content?: { readonly _model?: { show: boolean } };
+}
+
+const STAND_IN_ERROR_M = 300;
+const STAND_IN_PIXELS = 30;
+
+/**
+ * Until the right tiles arrive, Cesium shows a rougher one in their place. One that is a kilometre off is no help:
+ * seen from the tower it is a wall across the sky, for up to two seconds whenever the view turns. Those are hidden.
+ * What is rough because it is far away has a small error on the screen and stays.
+ */
+export function hidePoorStandIn(tile: StandIn, maximumScreenSpaceError: number): void {
+  const model = tile.content?._model;
+  if (!model) return;
+  const poor =
+    tile.geometricError > STAND_IN_ERROR_M &&
+    (tile._screenSpaceError ?? 0) > STAND_IN_PIXELS * maximumScreenSpaceError;
+  if (model.show === poor) model.show = !poor;
+}
+
 /** The finest of `tiles` that the ray meets, and where. */
 export function finestHit(
   tiles: Iterable<SurfaceTile>,

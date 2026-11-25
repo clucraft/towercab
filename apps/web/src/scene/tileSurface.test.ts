@@ -1,7 +1,7 @@
 import * as Cesium from 'cesium';
 import { Cartesian3, Cesium3DTileset, Matrix3, Ray } from 'cesium';
 import { describe, expect, it } from 'vitest';
-import { finestHit, ROUGHEST_M, type SurfaceTile } from './tileSurface';
+import { finestHit, hidePoorStandIn, ROUGHEST_M, type SurfaceTile } from './tileSurface';
 
 /** Straight down at x = y = 0, from 1000 m. */
 const down = new Ray(new Cartesian3(0, 0, 1000), new Cartesian3(0, 0, -1));
@@ -77,6 +77,34 @@ describe('finestHit', () => {
 
   it('skips tiles whose content is not there', () => {
     expect(read([{ geometricError: 4 }, { geometricError: 8, content: {} }, tile(16, 5)])?.height).toBe(5);
+  });
+});
+
+describe('hidePoorStandIn', () => {
+  const shown = (geometricError: number, pixels: number, wasShown = true) => {
+    const model = { show: wasShown };
+    hidePoorStandIn({ geometricError, _screenSpaceError: pixels, content: { _model: model } }, 16);
+    return model.show;
+  };
+
+  it('hides a tile a kilometre off that stands in for the ground around the tower', () => {
+    expect(shown(2055, Number.POSITIVE_INFINITY)).toBe(false);
+    expect(shown(1027, 900)).toBe(false);
+  });
+
+  it('keeps one that is rough because it is far away, and one that is good enough to stand in', () => {
+    expect(shown(2055, 14)).toBe(true);
+    expect(shown(2055, 300)).toBe(true);
+    expect(shown(128, Number.POSITIVE_INFINITY)).toBe(true);
+  });
+
+  it('shows it again when the camera has moved away', () => {
+    expect(shown(2055, 14, false)).toBe(true);
+  });
+
+  it('does nothing to a tile without a model', () => {
+    expect(() => hidePoorStandIn({ geometricError: 2055, content: {} }, 16)).not.toThrow();
+    expect(() => hidePoorStandIn({ geometricError: 2055 }, 16)).not.toThrow();
   });
 });
 
