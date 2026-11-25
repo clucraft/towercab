@@ -134,6 +134,8 @@ export const ConfigFileSchema = z
       .object({
         /** Look up an aircraft photo on planespotters.net when an aircraft is selected. */
         enabled: z.boolean().default(true),
+        /** When there is none, show a picture of the aircraft's type from Wikimedia Commons instead. */
+        types: z.boolean().default(true),
       })
       .prefault({}),
     /** Overpass API endpoint for the airport layout. Point this at your own instance for heavy use. */

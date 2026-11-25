@@ -23,6 +23,8 @@
     "gen:models": "tsx scripts/gen-models.ts",
     "probe": "tsx scripts/probe.ts",
     "verify:scene": "tsx scripts/verify-scene.ts",
+    "profile:phone": "tsx scripts/phone-profile.ts",
+    "check:types": "tsx scripts/check-type-articles.ts",
     "test:e2e": "playwright test",
     "record": "tsx scripts/record.ts",
     "screenshots": "tsx scripts/screenshots.ts"

@@ -85,6 +85,8 @@ export function upstreamRoutes(): FakeRoute[] {
     { match: 'overpass', body: fixtureText('overpass-klaf.json') },
     { match: 'aviationweather.gov', body: fixtureText('metar-klaf-kind.json') },
     { match: 'planespotters.net', body: fixtureText('planespotters-a0d5d6.json') },
+    { match: 'en.wikipedia.org', body: fixtureText('wikipedia-pageimages-p28.json') },
+    { match: 'commons.wikimedia.org', body: fixtureText('commons-imageinfo-p28.json') },
   ];
 }
 

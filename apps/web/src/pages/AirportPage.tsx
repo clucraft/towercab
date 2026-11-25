@@ -479,6 +479,7 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
               aircraft={selectedAircraft}
               now={now}
               photos={config.features.photos}
+              typePhotos={config.features.typePhotos}
               following={view === 'follow'}
               onFollow={() => sceneRef.current?.follow(selectedAircraft.hex)}
               onClose={() => select(null)}

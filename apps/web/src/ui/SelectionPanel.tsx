@@ -6,13 +6,14 @@ import {
   resolveAircraftType,
 } from '@towercab/shared';
 import { useEffect, useState } from 'react';
-import { type AircraftPhoto, api } from '../api';
+import { type AircraftPhoto, api, type TypePhoto } from '../api';
 
 interface Props {
   aircraft: Aircraft;
   /** The server's clock, for the data age. */
   now: number;
   photos: boolean;
+  typePhotos: boolean;
   following: boolean;
   onFollow(): void;
   onClose(): void;
@@ -38,23 +39,88 @@ function Row({ label, value }: { label: string; value: string | undefined }) {
   );
 }
 
-/** Details of the selected aircraft, with a Follow button and, when one exists, a photo. */
-export function SelectionPanel({ aircraft: a, now, photos, following, onFollow, onClose }: Props) {
-  const [photo, setPhoto] = useState<AircraftPhoto | null>(null);
-  const type = resolveAircraftType(a.typeCode, a.category);
+type Picture = { of: 'aircraft'; photo: AircraftPhoto } | { of: 'type'; photo: TypePhoto };
+
+/** A photo of this very aircraft if there is one, else a picture of its type, else nothing. */
+function usePicture(a: Aircraft, photos: boolean, typePhotos: boolean): Picture | null {
+  const [picture, setPicture] = useState<Picture | null>(null);
+  const { hex, typeCode } = a;
+  // Made-up aircraft and TIS-B tracks have no airframe to look up; they may still have a type.
+  const lookUp = photos && !hex.startsWith('~') && a.source !== 'simulator';
 
   useEffect(() => {
-    setPhoto(null);
-    if (!photos || a.hex.startsWith('~') || a.source === 'simulator') return;
+    setPicture(null);
     const controller = new AbortController();
-    api
-      .photo(a.hex, controller.signal)
-      .then(setPhoto)
+    const load = async (): Promise<Picture | null> => {
+      const photo = lookUp ? await api.photo(hex, controller.signal).catch(() => null) : null;
+      if (photo) return { of: 'aircraft', photo };
+      const type = typePhotos && typeCode ? await api.typePhoto(typeCode, controller.signal) : null;
+      return type && { of: 'type', photo: type };
+    };
+    load()
+      .then((found) => {
+        if (!controller.signal.aborted) setPicture(found);
+      })
       .catch(() => {
-        // No photo is not worth telling anyone about.
+        // No picture is not worth telling anyone about.
       });
     return () => controller.abort();
-  }, [a.hex, a.source, photos]);
+  }, [hex, typeCode, lookUp, typePhotos]);
+
+  return picture;
+}
+
+/** Every picture is shown with the credit its source asks for, and links to the page it comes from. */
+function PictureFigure({ picture, label }: { picture: Picture; label: string }) {
+  const [broken, setBroken] = useState(false);
+  if (broken) return null;
+  const { photo } = picture;
+  const alt =
+    picture.of === 'aircraft' ? `${label}, taken by ${picture.photo.photographer}` : picture.photo.subject;
+  return (
+    <figure className="photo" data-testid={`picture-${picture.of}`}>
+      <a href={photo.link} target="_blank" rel="noreferrer noopener">
+        <img
+          src={photo.thumbnail}
+          alt={alt}
+          width={photo.width ?? undefined}
+          height={photo.height ?? undefined}
+          referrerPolicy="no-referrer"
+          onError={() => setBroken(true)}
+        />
+      </a>
+      {picture.of === 'aircraft' ? (
+        <figcaption>
+          © {picture.photo.photographer} ·{' '}
+          <a href={photo.link} target="_blank" rel="noreferrer noopener">
+            planespotters.net
+          </a>
+        </figcaption>
+      ) : (
+        <figcaption>
+          <strong>{picture.photo.subject}</strong> (not this aircraft). Photo: {picture.photo.author},{' '}
+          {picture.photo.licenseUrl ? (
+            <a href={picture.photo.licenseUrl} target="_blank" rel="noreferrer noopener">
+              {picture.photo.license}
+            </a>
+          ) : (
+            picture.photo.license
+          )}
+          , via{' '}
+          <a href={photo.link} target="_blank" rel="noreferrer noopener">
+            Wikimedia Commons
+          </a>
+        </figcaption>
+      )}
+    </figure>
+  );
+}
+
+/** Details of the selected aircraft, with a Follow button and, when there is one, a picture. */
+export function SelectionPanel(props: Props) {
+  const { aircraft: a, now, photos, typePhotos, following, onFollow, onClose } = props;
+  const picture = usePicture(a, photos, typePhotos);
+  const type = resolveAircraftType(a.typeCode, a.category);
 
   const age = Math.max(0, (now - a.posTime) / 1000);
   const altitude = a.onGround
@@ -79,23 +145,7 @@ export function SelectionPanel({ aircraft: a, now, photos, following, onFollow, 
         </button>
       </header>
 
-      {photo && (
-        <figure className="photo">
-          <a href={photo.link} target="_blank" rel="noreferrer noopener">
-            <img
-              src={photo.thumbnail}
-              alt={`${aircraftLabel(a)}, taken by ${photo.photographer}`}
-              loading="lazy"
-            />
-          </a>
-          <figcaption>
-            © {photo.photographer} ·{' '}
-            <a href={photo.link} target="_blank" rel="noreferrer noopener">
-              planespotters.net
-            </a>
-          </figcaption>
-        </figure>
-      )}
+      {picture && <PictureFigure key={picture.photo.thumbnail} picture={picture} label={aircraftLabel(a)} />}
 
       <dl>
         <Row label="Callsign" value={a.callsign} />

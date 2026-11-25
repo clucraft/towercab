@@ -98,6 +98,8 @@ export interface ClientConfig {
     cameras: boolean;
     admin: boolean;
     photos: boolean;
+    /** Pictures of the aircraft type, when there is none of the aircraft. */
+    typePhotos: boolean;
   };
   /** How far behind real time the scene renders, milliseconds. */
   renderDelayMs: number;

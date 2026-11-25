@@ -4,6 +4,7 @@ import type { Services } from '../services';
 import { renderMetrics } from './metrics';
 
 const HEX = /^~?[0-9a-f]{6}$/i;
+const TYPE_CODE = /^[a-z0-9]{2,4}$/i;
 
 /** Credit lines for the data sources that are switched on. Imagery credits come from Cesium itself. */
 export function buildAttributions(services: Services): ClientConfig['attributions'] {
@@ -22,6 +23,8 @@ export function buildAttributions(services: Services): ClientConfig['attribution
   list.push({ name: 'OurAirports', url: 'https://ourairports.com/data/' });
   list.push({ name: 'aviationweather.gov', url: 'https://aviationweather.gov' });
   if (photos.enabled) list.push({ name: 'planespotters.net', url: 'https://www.planespotters.net' });
+  if (photos.types)
+    list.push({ name: 'Wikimedia Commons', url: 'https://commons.wikimedia.org', note: 'type pictures' });
   // Camera providers are credited when one of their cameras is actually shown.
   const shown = services.cameras.registry.providersInUse();
   if (shown.has('windy'))
@@ -72,6 +75,7 @@ export function registerApiRoutes(app: FastifyInstance, services: Services): voi
         cameras: services.cameras.registry.any(),
         admin: Boolean(secrets.adminToken),
         photos: current.photos.enabled,
+        typePhotos: current.photos.types,
       },
       renderDelayMs: current.client.renderDelayMs,
       attributions: buildAttributions(services),
@@ -97,6 +101,15 @@ export function registerApiRoutes(app: FastifyInstance, services: Services): voi
     if (!HEX.test(hex) || hex.startsWith('~')) return { photo: null };
     void reply.header('Cache-Control', 'public, max-age=3600');
     return { photo: await services.photos.get(hex) };
+  });
+
+  app.get<{ Params: { code: string } }>('/api/type-photos/:code', async (request, reply) => {
+    if (!config.current.photos.types) return reply.code(404).send({ error: 'photos_disabled' });
+    const photo = TYPE_CODE.test(request.params.code)
+      ? await services.typePhotos.get(request.params.code)
+      : null;
+    void reply.header('Cache-Control', `public, max-age=${photo ? 86_400 : 600}`);
+    return { photo };
   });
 
   app.get('/metrics', async (_request, reply) => {

@@ -33,6 +33,18 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   return (await res.json()) as T;
 }
 
+/** A picture of an aircraft type, from Wikimedia Commons. */
+export interface TypePhoto {
+  subject: string;
+  thumbnail: string;
+  width: number | null;
+  height: number | null;
+  link: string;
+  author: string;
+  license: string;
+  licenseUrl: string | null;
+}
+
 export interface AircraftPhoto {
   thumbnail: string;
   width: number | null;
@@ -50,6 +62,10 @@ export const api = {
     getJson<CamerasResponse>(`/api/cameras/${encodeURIComponent(icao)}`, signal),
   metar: (icao: string, signal?: AbortSignal) =>
     getJson<{ metar: Metar | null }>(`/api/metar/${encodeURIComponent(icao)}`, signal).then((r) => r.metar),
+  typePhoto: (typeCode: string, signal?: AbortSignal) =>
+    getJson<{ photo: TypePhoto | null }>(`/api/type-photos/${encodeURIComponent(typeCode)}`, signal).then(
+      (r) => r.photo,
+    ),
   photo: (hex: string, signal?: AbortSignal) =>
     getJson<{ photo: AircraftPhoto | null }>(`/api/photos/${encodeURIComponent(hex)}`, signal).then(
       (r) => r.photo,

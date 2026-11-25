@@ -89,9 +89,10 @@ discovery:
 client:
   renderDelayMs: 2500
 
-# Aircraft photos from planespotters.net, shown when an aircraft is selected.
+# Pictures shown when an aircraft is selected.
 photos:
-  enabled: true
+  enabled: true # a photo of the aircraft itself, from planespotters.net
+  types: true # when there is none, a picture of its type, from Wikimedia Commons
 
 # Optional. Overpass API endpoint used for the airport layout (one query per airport per week).
 # overpassUrl: "https://overpass-api.de/api/interpreter"

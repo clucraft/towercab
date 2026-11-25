@@ -18,6 +18,7 @@ import { MetarService } from './reference/metar';
 import { OurAirportsStore } from './reference/ourairports';
 import { LayoutStore } from './reference/overpass';
 import { PhotoService } from './reference/photos';
+import { TypePhotoService } from './reference/typePhotos';
 import { WsHub } from './ws/hub';
 
 /** Everything the routes and the WebSocket hub work with. */
@@ -29,6 +30,7 @@ export interface Services {
   airports: AirportService;
   metar: MetarService;
   photos: PhotoService;
+  typePhotos: TypePhotoService;
   live: LiveService;
   hub: WsHub;
   cameras: CameraServices;
@@ -84,6 +86,7 @@ export async function createServices(options: CreateServicesOptions): Promise<Se
   const airports = new AirportService(ourAirports, layouts, logger);
   const metar = new MetarService({ userAgent, fetchImpl, log: logger });
   const photos = new PhotoService({ userAgent, fetchImpl });
+  const typePhotos = new TypePhotoService({ userAgent, fetchImpl });
 
   const live = new LiveService({
     airports,
@@ -119,6 +122,7 @@ export async function createServices(options: CreateServicesOptions): Promise<Se
     airports,
     metar,
     photos,
+    typePhotos,
     live,
     hub,
     cameras,

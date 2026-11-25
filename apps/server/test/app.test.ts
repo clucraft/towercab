@@ -196,7 +196,14 @@ describe('server', () => {
         version: 'test',
         cesiumIonToken: 'ion-test-token',
         googleMapsApiKey: null,
-        features: { photoreal: true, terrain: true, cameras: true, admin: true, photos: true },
+        features: {
+          photoreal: true,
+          terrain: true,
+          cameras: true,
+          admin: true,
+          photos: true,
+          typePhotos: true,
+        },
         renderDelayMs: 2500,
       });
       expect(body.attributions.map((a) => a.name)).toEqual([
@@ -205,6 +212,7 @@ describe('server', () => {
         'OurAirports',
         'aviationweather.gov',
         'planespotters.net',
+        'Wikimedia Commons',
       ]);
       // Server-side secrets never appear, under any name.
       expect(res.body).not.toContain('secret-admin');
@@ -246,6 +254,21 @@ describe('server', () => {
         photo: null,
       });
       expect((await app.inject({ method: 'GET', url: '/api/photos/xyz' })).json()).toEqual({ photo: null });
+    });
+
+    it('finds a picture of an aircraft type, and takes nothing but a type designator', async () => {
+      await start();
+      const res = await app.inject({ method: 'GET', url: '/api/type-photos/P28R' });
+      expect(res.json()).toMatchObject({
+        photo: { subject: 'Piper PA-28 Cherokee', author: 'Mike Burdett', license: 'CC BY-SA 2.0' },
+      });
+      expect(res.headers['cache-control']).toBe('public, max-age=86400');
+      for (const code of ['ZZZZ', 'P28R%20', '..%2Fx', 'toString']) {
+        const none = await app.inject({ method: 'GET', url: `/api/type-photos/${code}` });
+        expect(none.json(), code).toEqual({ photo: null });
+        // Not for long: the next question may find one.
+        expect(none.headers['cache-control']).toBe('public, max-age=600');
+      }
     });
 
     it('exposes Prometheus metrics', async () => {

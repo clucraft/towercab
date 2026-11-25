@@ -6,6 +6,21 @@ import { type Runway, rankRunwaysByWind } from './airportInfo';
 import { CameraConfigSchema } from './camera';
 import { ClientMessageSchema } from './messages';
 import { describeWind, hpaToInHg } from './metar';
+import { TYPE_ARTICLE_COUNT, typeArticle } from './typeArticles';
+
+describe('articles about aircraft types', () => {
+  it('has one for every type the local field sees, whatever the spelling of the designator', () => {
+    for (const code of ['C152', 'C172', 'P28A', 'P28R', 'PA44', 'SR22', 'BE58', 'PC12', 'CRJ9', 'B738'])
+      expect(typeArticle(code), code).not.toBeNull();
+    expect(typeArticle(' p28r ')).toBe('Piper PA-28 Cherokee');
+    expect(TYPE_ARTICLE_COUNT).toBeGreaterThan(400);
+  });
+
+  it('has none for an unknown type, and is not fooled by the names of object members', () => {
+    for (const code of ['ZZZZ', '', null, undefined, 'constructor', '__proto__', 'TOSTRING'])
+      expect(typeArticle(code), String(code)).toBeNull();
+  });
+});
 
 describe('aircraft type table', () => {
   const required = [
