@@ -50,6 +50,7 @@ import { SCHEMATIC } from './palette';
 import { DetailGovernor, PROFILES, type Quality, type QualityProfile } from './quality';
 import { DAY_SUN, LOWEST_LIGHT_DEG, type SkySetting, skyAt } from './sky';
 import { GroundLight, SkyDome } from './skyDome';
+import { askAgain, type RetryTile, TileRefusals } from './tileRetry';
 import { hidePoorStandIn, type StandIn, tileProbe } from './tileSurface';
 import { TrailLayer } from './trails';
 import { buildViewPresets, resolveView, type ViewPreset } from './views';
@@ -198,6 +199,8 @@ export class SceneController {
   private scriptTimes: number[] = [];
   private scriptThisFrame = 0;
   private tileFailures: number[] = [];
+  private readonly refusals = new TileRefusals();
+  private tilesArrived = 0;
   /** Rendering time spent waiting for the first tiles, or null when not waiting. */
   private tilesWaitMs: number | null = null;
   private destroyed = false;
@@ -396,6 +399,11 @@ export class SceneController {
     // `undefined` is how Cesium is told "as fast as the display"; its types leave it out.
     this.viewer.targetFrameRate = (photoreal ? this.profile.photorealFrameRate : undefined) as number;
     if (this.tileset) this.tileset.show = photoreal;
+    // Someone who switches to Photoreal again wants the tiles that were refused the last time.
+    if (photoreal && this.refusals.missing > 0) {
+      this.tilesWaitMs = 0;
+      this.askAgain(this.refusals.restart(performance.now()));
+    }
     scene.globe.show = !photoreal;
     this.layout.show = !photoreal;
     scene.globe.showGroundAtmosphere = false;
@@ -809,8 +817,16 @@ export class SceneController {
 
     if (this.tilesWaitMs !== null) {
       this.tilesWaitMs += Math.min(elapsed, 250);
-      if (this.tilesWaitMs > TILES_TIMEOUT_MS) this.photorealFailed('the tiles did not load');
+      if (this.tilesWaitMs > TILES_TIMEOUT_MS) {
+        this.photorealFailed(
+          this.refusals.missing > 0
+            ? 'Google is limiting requests just now, try again in a few minutes'
+            : 'the tiles did not load',
+        );
+      }
     }
+    const again = this.currentMode === 'photoreal' ? this.refusals.due(now) : null;
+    if (again) this.askAgain(again);
 
     if (this.currentMode === 'photoreal' && this.tilesWaitMs === null) {
       const verdict = this.governor.frame(elapsed, this.tileset?.tilesLoaded === false);
@@ -1119,24 +1135,28 @@ export class SceneController {
     this.tileset = this.viewer.scene.primitives.add(tileset) as Cesium3DTileset;
 
     this.tilesWaitMs = 0;
-    tileset.initialTilesLoaded.addEventListener(() => {
-      this.tilesWaitMs = null;
+    tileset.tileLoad.addEventListener(() => {
+      this.tilesArrived += 1;
     });
     tileset.tileVisible.addEventListener((tile: StandIn) => {
       hidePoorStandIn(tile, tileset.maximumScreenSpaceError);
     });
     tileset.allTilesLoaded.addEventListener(() => {
+      // To Cesium a tile that failed is done with. A scene that is mostly missing has not arrived.
+      if (this.tilesArrived >= this.refusals.missing) this.tilesWaitMs = null;
       // What is on screen has just become finer; heights read from the coarser tiles are out of date.
       if (this.ground instanceof ProbedGround) this.ground.refresh();
     });
-    tileset.tileFailed.addEventListener((failure: { message?: string }) => {
+    tileset.tileFailed.addEventListener((failure: { url?: string; message?: string }) => {
       const now = performance.now();
       const text = String(failure?.message ?? '');
-      // Refusals and quota errors will not get better by waiting.
-      if (/\b(401|403|429)\b/.test(text)) {
-        this.photorealFailed(
-          /429/.test(text) ? 'the tile quota is used up' : 'the tile service refused the request',
-        );
+      if (/\b429\b/.test(text)) {
+        this.tileRefused(failure.url ?? '', now);
+        return;
+      }
+      // Not being allowed to have the tiles will not get better by waiting.
+      if (/\b(401|403)\b/.test(text)) {
+        this.photorealFailed('the tile service refused the request');
         return;
       }
       this.tileFailures = this.tileFailures.filter((t) => now - t < TILE_FAILURE_WINDOW_MS);
@@ -1144,6 +1164,26 @@ export class SceneController {
       if (this.tileFailures.length >= TILE_FAILURES_LIMIT)
         this.photorealFailed('too many tiles failed to load');
     });
+  }
+
+  /** Too many requests: mostly a limit per minute, which is over soon. The tiles are asked for again by and by. */
+  private tileRefused(url: string, now: number): void {
+    if (this.destroyed || this.currentMode !== 'photoreal') return;
+    const answer = this.refusals.refused(url, now);
+    if (answer === 'first') {
+      this.callbacks.onNotice?.(
+        'Google is limiting requests just now, so parts of the scene are missing. Asking again soon.',
+      );
+    } else if (answer === 'give up') {
+      this.photorealFailed('Google has refused tiles for minutes, so the quota may be used up');
+    }
+  }
+
+  private askAgain(urls: ReadonlySet<string>): void {
+    if (!this.tileset) return;
+    askAgain(this.tileset.root as unknown as RetryTile, urls);
+    this.wakeTiles();
+    this.viewer.scene.requestRender();
   }
 
   private photorealFailed(reason: string): void {
