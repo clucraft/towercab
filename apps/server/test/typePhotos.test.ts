@@ -83,6 +83,15 @@ describe('type pictures: reading the answers', () => {
     expect(unnamed).toMatchObject({ author: 'unknown author', license: 'Public domain', licenseUrl: null });
   });
 
+  it('never cuts a credit short', () => {
+    // Made up, and longer than any name: files that were worked on by several people have credits like this.
+    const author = `Original.jpg: A. Photographer from a town, ${'a long place name, '.repeat(6)}derivative work: B. Editor`;
+    expect(author.length).toBeGreaterThan(150);
+    expect(parseImageInfo(imageInfo({ Artist: author, LicenseShortName: 'CC BY-SA 2.0' }), 'x')?.author).toBe(
+      author,
+    );
+  });
+
   it('shows nothing whose licence is unknown or that is not on Wikimedia’s servers', () => {
     expect(parseImageInfo(imageInfo({ Artist: 'x' }), 'x')).toBeNull();
     const licence = { LicenseShortName: 'CC0' };

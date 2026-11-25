@@ -17,6 +17,8 @@ import { ProviderError } from '../providers/types';
 export const WIKIPEDIA_API = 'https://en.wikipedia.org/w/api.php';
 export const COMMONS_API = 'https://commons.wikimedia.org/w/api.php';
 const THUMBNAIL_WIDTH = 500;
+/** A credit has to be complete, so this only stops something absurd. */
+const LONGEST_AUTHOR = 500;
 
 export interface TypePhoto {
   /** What the picture shows: the title of the article it comes from. */
@@ -102,7 +104,7 @@ export function parseImageInfo(json: unknown, subject: string): TypePhoto | null
     width: typeof info.thumbwidth === 'number' ? info.thumbwidth : null,
     height: typeof info.thumbheight === 'number' ? info.thumbheight : null,
     link: info.descriptionurl,
-    author: author.length > 120 ? `${author.slice(0, 119)}…` : author,
+    author: author.length > LONGEST_AUTHOR ? `${author.slice(0, LONGEST_AUTHOR - 1)}…` : author,
     license,
     licenseUrl: licenseUrl.startsWith('https://') ? licenseUrl : null,
   };
