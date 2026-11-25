@@ -13,6 +13,7 @@ Live aircraft around an airport in a 3D scene, like the view from the tower cab,
   **Schematic** (runways, taxiways and buildings from OpenStreetMap), which needs no token at all.
 - Views from the tower, from above, from each runway end, in orbit, or following one aircraft.
 - A side panel with the traffic by phase of flight, the METAR, and how healthy each data source is.
+- Details of the aircraft you select, with a photo of it, or a picture of its type when nobody has taken one.
 - Live cameras you add yourself, beside the scene or laid over it with the aircraft labels on top.
 - One container. The server fetches the traffic once per airport and shares it with every browser; when
   nobody is watching, it stops asking.
@@ -81,7 +82,7 @@ Edits are picked up while the server runs, and an edit that does not validate is
 | `go2rtc`    | Address of a go2rtc instance, for your own RTSP camera                                                      |
 | `discovery` | Camera search on the admin page                                                                             |
 | `client`    | How far behind real time browsers draw (2.5 s by default)                                                   |
-| `photos`    | Aircraft photos from planespotters.net, on or off                                                           |
+| `photos`    | Aircraft photos from planespotters.net and pictures of aircraft types from Wikimedia Commons, on or off     |
 
 ### Environment variables
 
@@ -164,11 +165,22 @@ Add these to an airport's address:
 | `?cam=<id>`            | Open a camera. `&camlayout=split`, `grid` or `overlay` picks the layout.    |
 | `?replay=klaf-pattern` | Play a recording instead of live traffic.                                   |
 | `?sim=150`             | Show that many simulated aircraft instead of live traffic.                  |
+| `?quality=lite`        | Draw Photoreal with less detail, or with more: `high`. [Phones](#phones)    |
 | `?fps`                 | Show the frame rate.                                                        |
 
 `/debug/KLAF` shows the same traffic as a table with source health, `/admin` is the
 [admin page](docs/ADDING_A_CAMERA.md#the-admin-page), `/healthz` is the health check and `/metrics` has
 Prometheus metrics.
+
+### Phones
+
+On a phone, a tablet, or a computer with little memory, Photoreal runs with a lighter profile: coarser
+tiles, less antialiasing, a smaller memory allowance and about 30 frames a second. It tries a sharper
+picture when there is room for one and steps down when there is not. `?quality=high` and `?quality=lite` choose
+for you, and `?fps` shows which is in use. Schematic is much the lighter of the two base maps.
+
+If the browser takes the graphics away, which on phones mostly means memory ran out, the scene is built again
+by itself, in Schematic if it was Photoreal that failed.
 
 ### Cameras
 
@@ -225,7 +237,9 @@ airport. For the ramp and the taxiways, [use your own receiver](docs/RECEIVER.md
 Airport and runway data come from [OurAirports](https://ourairports.com/data/) (public domain), the airport
 layout from [OpenStreetMap](https://www.openstreetmap.org/copyright) (ODbL), weather from
 [aviationweather.gov](https://aviationweather.gov), aircraft photos from
-[planespotters.net](https://www.planespotters.net). [ATTRIBUTION.md](ATTRIBUTION.md) has the full list.
+[planespotters.net](https://www.planespotters.net), and pictures of aircraft types from
+[Wikimedia Commons](https://commons.wikimedia.org), each with its author and licence.
+[ATTRIBUTION.md](ATTRIBUTION.md) has the full list.
 
 ## Development
 
@@ -243,8 +257,10 @@ In development the server keeps its config and data in a gitignored `.local/` fo
 Set `CONFIG_DIR` and `DATA_DIR` to use other folders. Put tokens in `.env`, which is gitignored too.
 
 Tools for checking the scene in a real browser: `pnpm probe` (frame rate, screenshots), `pnpm verify:scene`
-(no jumps, no backward steps, wheels on the ground), `pnpm soak` (30 minutes against the live sources, fails on
-any rate-limit answer) and `pnpm screenshots` (the pictures in this file).
+(no jumps, no backward steps, wheels on the ground), `pnpm profile:phone` (what the scene costs on a slow device
+with a small screen), `pnpm soak` (30 minutes against the live sources, fails on any rate-limit answer) and
+`pnpm screenshots` (the pictures in this file). `pnpm check:types` checks the table of articles about aircraft
+types against ICAO and Wikipedia.
 
 [docs/PLAN.md](docs/PLAN.md) is the build plan and [docs/DECISIONS.md](docs/DECISIONS.md) records every
 decision and every place where the app differs from the plan, including what could not be verified.

@@ -591,3 +591,88 @@ The container was created with those same parameters and the template's values, 
 in the templates folder. Afterwards the Docker manager's own lookup returned that template for the container,
 the health check passed, and a browser on another machine showed live traffic at KIND in Photoreal at 60 fps.
 Not done: creating the container by clicking through Add Container in the web UI, and the reverse proxy.
+
+### D-068 Trails shared a material, and the scene stopped when an aircraft left (Fix)
+
+Reported from use: "An error occurred while rendering. This object was destroyed." Trails of one phase of flight
+shared one Cesium `Material`. Removing a line from a `PolylineCollection` destroys its material
+(`Polyline.prototype._destroy` in Cesium 1.147), so the first aircraft to leave took away the material of every
+other trail in its phase, and of every later one. Each line now has a material of its own; Cesium groups lines by
+colour, so they are still drawn together. A unit test and a browser test were seen to fail on the old code.
+
+### D-069 A scene that fails is built again
+
+Cesium stops for good after an error while drawing, and cannot recover from a lost graphics context, which on a
+phone mostly means that memory ran out. Its error panel is switched off. Instead the page builds a new scene with
+the same view, base map and selection, while the traffic feed carries on. If it was Photoreal that lost the
+context, or failed twice, the new scene is in Schematic. After three new scenes in two minutes the page gives up,
+says so, and offers to reload.
+
+### D-070 Production builds leave out Cesium's debug checks
+
+Cesium's sources check the arguments of every matrix and vector function inside `//>>includeStart('debug')`
+blocks, which its own release build strips. Imported as ES modules they were all still there (5,476 blocks). A
+small Vite plugin removes them when building, the same way. With the processor slowed six times, Schematic went
+from 52 to 59 frames a second. Development and unit tests keep the checks.
+
+### D-071 What made Photoreal slow on phones
+
+Measured with `pnpm profile:phone --software --slowdown 4`: a phone-sized touch screen in Chromium, the processor
+slowed four times and drawing done in software, so that the cost of drawing shows. 0.1.0 ran at 13 to 15 frames a
+second. The time went into three things:
+
+- Reading heights from the tiles. In WebGL 2 Cesium does this by reading vertex buffers back from the graphics
+  processor, which first has to finish everything queued: 36 to 43 ms of every frame. `enableCollision` did it
+  whenever the view moved; our own surface probes did it all the time. Collision is now off and the camera is kept
+  above ground by the probes, which remember their answers and may take a fixed share of the time (12 percent, 6 on a
+  phone) however slow they are.
+- Walking the tree of tiles every frame. While the view is still and everything has arrived, the answer cannot
+  change, so the last one is kept (`debugFreezeFrame`, a public property in spite of its name). Frozen tiles are not
+  marked as in use, so this is only done while the cache has room; otherwise Cesium would unload what is on screen.
+- Antialiasing and order-independent transparency: extra full-screen passes.
+
+Also found: the cache limits for Google's tiles are 1.5 GB plus 1 GB by default, and an environment map was
+computed for tiles that are unlit.
+
+### D-072 Quality profiles, and a governor (Unverified on real phones)
+
+`lite` for a touch screen, 4 GB of memory or less, or two threads or fewer; `high` otherwise; `?quality=` decides
+for both. Lite draws at about 30 frames a second with a 160 MB tile cache. A governor steps the detail down while
+the scene is slow and never back up, except that lite tries a sharper picture once, when it has run well for ten
+seconds, and keeps it only if it still does. Frames drawn while tiles arrive count half.
+
+On the stand-in: loading 13 to 30 frames a second, settled 15 to 31 (the limit), turning 14 to 31; time spent
+waiting for the graphics processor 36 to 43 ms a frame down to under 2; tile memory 154 MB to 54. No real phone was
+available; the stand-in says where the time goes, not what a given phone will reach.
+
+### D-073 `skipLevelOfDetail` for Google's tiles
+
+From the KLAF tower the ground in front of the camera stayed a blur: a tile 1.5 km across that never refined
+although all eight of its children were there. Cesium's default traversal refines a tile only when every
+descendant with content has loaded, and counts an empty tile that is out of view and fine enough already as not
+loaded. (Its source says so, and makes an exception for vector tilesets only.) The other traversal has no such rule. It
+shows the airfield sharply from the tower and loads half as many tiles (157 instead of 330). No artefacts were
+seen in the tower, overhead, orbit and runway 10 views.
+
+### D-074 A picture of the type when there is none of the aircraft
+
+Many light aircraft have no photo on planespotters.net: of the three KLAF aircraft in the test data, one has. The
+next best thing is a picture of the type. Wikidata was the obvious source and has no property for ICAO type designators (checked
+on 2026-11-24), and Wikipedia's own list of designators leaves out light aircraft. So the table from designator to
+article (`type-articles.json`, 476 designators) is written by hand, and `pnpm check:types` checks every row: the
+designator against ICAO Doc 8643 (`doc8643.icao.int`), the article against Wikipedia (exists, not a disambiguation
+page, has a free lead image), and the two names against each other. The first run caught four designators that
+were remembered wrongly.
+
+Only the article's title is in the repository. The picture's address, author and licence are asked for when needed
+(Wikipedia's `pageimages`, then Commons' `imageinfo`), so they stay right when a file is replaced or Wikimedia
+moves its thumbnails, which now come from thumb.wikimedia.org. Nothing is shown without a licence, the
+caption says that it is not this aircraft, and the file's page is linked.
+
+### D-075 Manners towards Wikimedia
+
+From its published rules, read on 2026-11-24: one request at a time, answers cached (seven days, one day for "none"),
+a User-Agent that says who is asking, a standard thumbnail width (500), hotlinking allowed with the credit the
+licence asks for. While testing with an anonymous client the API answered 429 after some twenty requests in a few minutes; the
+server treats that as "ask again in ten minutes", not as "there is no picture". planespotters.net's API page refuses
+to be read by a program (403), so its other endpoints were left alone.

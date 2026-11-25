@@ -72,7 +72,7 @@ towercab/
     e2e/                       Playwright smoke test
   packages/shared/
     src/                       schemas, messages, geo, altitude, type table lookup
-    data/aircraft-types.json
+    data/aircraft-types.json   dimensions by type; type-articles.json has the Wikipedia article of each
   config/config.example.yaml
   docker/                      Dockerfile, go2rtc example, receiver env example
   docker-compose.yml           core app + profiles `receiver`, `cameras`
@@ -142,6 +142,13 @@ towercab/
 - [x] `docs/RECEIVER.md`, `docs/ADDING_AN_AIRPORT.md`, `ATTRIBUTION.md`
 - [x] Tag `v0.1.0`
 
+### After 0.1.0
+
+- [x] The scene stopped with "This object was destroyed" when an aircraft left (D-068); a scene that fails for
+      any reason is built again (D-069)
+- [x] Photoreal on phones (D-070 to D-073)
+- [x] A picture of the aircraft type when there is no photo of the aircraft (D-074, D-075)
+
 ### Not verified, for want of hardware, accounts or keys
 
 Each is recorded in DECISIONS.md with what was checked instead.
@@ -151,7 +158,7 @@ Each is recorded in DECISIONS.md with what was checked instead.
 - [ ] A local receiver with real hardware; the `receiver` compose profile (D-065)
 - [ ] YouTube and Windy discovery against real search results (D-052)
 - [ ] airplanes.live and OpenSky with credentials (D-011, D-016)
-- [ ] Frame rate on integrated graphics (D-038)
+- [ ] Frame rate on integrated graphics (D-038), and on real phones (D-072)
 - [ ] A `kind-busy` recording, and taxiway alignment at KIND with taxiing traffic (D-041, D-047)
 
 ## Per-phase gate
