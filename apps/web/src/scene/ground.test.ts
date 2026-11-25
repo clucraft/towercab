@@ -215,6 +215,62 @@ describe('ProbedGround', () => {
     expect(ground.heightAt(-86.29, 39.71)).toBe(207);
   });
 
+  it('spends no more than its share of the time on reads, however slow they are', () => {
+    // A device on which one read takes 20 ms, at 30 frames a second.
+    const ground = make(
+      () => {
+        clock += 20;
+        return 200;
+      },
+      { probesPerFrame: 6, share: 0.06 },
+    );
+    const ask = () => {
+      for (let i = 0; i < 40; i += 1) ground.heightAt(-86.29 + i * 0.001, 39.71);
+    };
+    // The first read has credit to draw on; it uses it all up.
+    ask();
+    expect(ground.probeCount).toBe(1);
+    for (let frame = 0; frame < 300; frame += 1) {
+      ground.beginFrame(33);
+      ask();
+    }
+    // Ten seconds at 6 percent is 600 ms: about thirty reads, where the cap alone would allow 1800.
+    expect(ground.probeCount).toBeGreaterThan(20);
+    expect(ground.probeCount).toBeLessThan(40);
+  });
+
+  it('reads again when told that the surface has changed, and serves the old answer until then', () => {
+    let height = 214;
+    const ground = make(() => height, { probesPerFrame: 2 });
+    expect(ground.heightAt(-86.29, 39.71)).toBe(214);
+    ground.heightAt(-86.29, 39.72);
+    height = 208;
+    ground.refresh();
+    expect(ground.peek(-86.29, 39.71)).toBe(214);
+    // No allowance left in this frame.
+    expect(ground.heightAt(-86.29, 39.71)).toBe(214);
+    ground.beginFrame();
+    expect(ground.heightAt(-86.29, 39.71)).toBe(208);
+  });
+
+  it('reads places it has never seen before it reads old ones again', () => {
+    const asked: number[] = [];
+    const ground = make(
+      (lon) => {
+        asked.push(Math.round((lon + 86.29) * 1000));
+        return 200;
+      },
+      { probesPerFrame: 4 },
+    );
+    for (let i = 0; i < 4; i += 1) ground.heightAt(-86.29 + i * 0.001, 39.71);
+    ground.beginFrame();
+    ground.refresh();
+    asked.length = 0;
+    // Four old places ask first, then two new ones: half of the allowance was kept for those.
+    for (const i of [0, 1, 2, 3, 10, 11]) ground.heightAt(-86.29 + i * 0.001, 39.71);
+    expect(asked).toEqual([0, 1, 10, 11]);
+  });
+
   it('peek never reads', () => {
     let calls = 0;
     const ground = make(() => {

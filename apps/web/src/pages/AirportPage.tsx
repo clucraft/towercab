@@ -5,7 +5,8 @@ import { CAMERA_LAYOUTS, CameraDock, type CameraLayout } from '../cameras/Camera
 import { replayFeed } from '../live/replayFeed';
 import { type FeedFactory, LiveStore, webSocketFeed } from '../live/store';
 import { navigate, setQuery, useLocation } from '../router';
-import type { SceneController, SceneMode, SceneStats } from '../scene/SceneController';
+import { chooseQuality, readDeviceHints } from '../scene/quality';
+import type { SceneController, SceneFailure, SceneMode, SceneStats } from '../scene/SceneController';
 import { buildViewPresets, viewForShortcut } from '../scene/views';
 import { simFeed } from '../sim/simFeed';
 import { SelectionPanel } from '../ui/SelectionPanel';
@@ -20,6 +21,9 @@ interface Notice {
 const METAR_REFRESH_MS = 5 * 60_000;
 /** On a phone held sideways, or any small window, the side panel starts closed and opens over the scene. */
 const SMALL_SCREEN = '(max-width: 900px), (max-height: 520px)';
+/** A scene that fails is built again, but not for ever: this many times within the window. */
+const REBUILDS = 3;
+const REBUILD_WINDOW_MS = 120_000;
 
 /** `/KLAF`: the 3D view of one airport. */
 export function AirportPage({ icao }: { icao: string }) {
@@ -94,6 +98,11 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
   const [feed] = useState(() => chooseFeed(initial, props.airport));
   const [store] = useState(() => new LiveStore(props.airport.icao, feed.factory));
   const [ready, setReady] = useState(false);
+  const [quality] = useState(() => chooseQuality(readDeviceHints(), initial.get('quality')));
+  /** Goes up when the scene has to be built again. */
+  const [generation, setGeneration] = useState(0);
+  const [broken, setBroken] = useState<string | null>(null);
+  const failures = useRef<number[]>([]);
   const [mode, setMode] = useState<SceneMode>(
     initial.get('mode') === 'schematic' || !config.features.photoreal ? 'schematic' : 'photoreal',
   );
@@ -123,15 +132,48 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
     setTimeout(() => setNotices((list) => list.filter((n) => n.id !== id)), 9000);
   }, []);
 
-  // Build the scene once per airport. The scene module (and Cesium with it) is loaded on demand, so the
-  // landing page and the live table stay small.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the scene is created once; later changes go through its methods
+  // What a scene built again should come back to. Read when it is built, not a reason to build it.
+  const wanted = useRef({ mode, view, selected, trails });
+  wanted.current = { mode, view, selected, trails };
+
+  useEffect(() => {
+    store.start();
+    return () => store.stop();
+  }, [store]);
+
+  /** The scene stopped drawing. Build a new one, in Schematic if Photoreal seems to be the trouble. */
+  const onFailed = useCallback(
+    (failure: SceneFailure) => {
+      const now = Date.now();
+      failures.current = [...failures.current.filter((t) => now - t < REBUILD_WINDOW_MS), now];
+      if (failures.current.length > REBUILDS) {
+        setBroken(failure.message);
+        return;
+      }
+      if (failure.mode === 'photoreal' && (failure.kind === 'context' || failures.current.length > 1)) {
+        wanted.current.mode = 'schematic';
+        setMode('schematic');
+        notify(
+          failure.kind === 'context'
+            ? 'Photoreal needed more graphics memory than this device has. Showing Schematic.'
+            : 'Photoreal stopped working. Showing Schematic.',
+        );
+      } else {
+        notify('The 3D scene stopped and was started again.');
+      }
+      setGeneration((n) => n + 1);
+    },
+    [notify],
+  );
+
+  // Build the scene: once per airport, and again if it fails. The scene module (and Cesium with it) is
+  // loaded on demand, so the landing page and the live table stay small.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: later changes go through the scene's methods
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     let cancelled = false;
     let scene: SceneController | null = null;
-    store.start();
     import('../scene/SceneController')
       .then(({ SceneController }) =>
         SceneController.create({
@@ -139,8 +181,9 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
           airport,
           config,
           store,
-          mode,
-          view,
+          mode: wanted.current.mode,
+          view: wanted.current.view,
+          quality,
           // A scene that was discarded before it finished starting must not report back.
           callbacks: {
             onSelect: (hex) => {
@@ -165,6 +208,9 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
             onNotice: (text) => {
               if (!cancelled) notify(text);
             },
+            onFailed: (failure) => {
+              if (!cancelled) onFailed(failure);
+            },
           },
         }),
       )
@@ -177,6 +223,9 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
         sceneRef.current = created;
         // A handle for the smoke test and for debugging from the console.
         (window as unknown as { __towercab?: unknown }).__towercab = created;
+        created.setTrails(wanted.current.trails);
+        // After a rebuild the same aircraft is selected as before.
+        if (wanted.current.selected) created.select(wanted.current.selected);
         setReady(true);
       })
       .catch((err: Error) => {
@@ -187,9 +236,9 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
       cancelled = true;
       scene?.destroy();
       sceneRef.current = null;
-      store.stop();
+      setReady(false);
     };
-  }, []);
+  }, [generation]);
 
   // The airport layout comes from OpenStreetMap and may still be on its way the first time an airport
   // is opened. Ask again a few times until it is there.
@@ -366,7 +415,16 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
       <div className={`workspace${panelOpen ? ' with-panel' : ''}`}>
         <div className={`stage${showing && layout === 'split' ? ' split' : ''}`}>
           <div className="scene" ref={containerRef} data-testid="scene" />
-          {!ready && <div className="scene-loading muted">Starting the 3D scene…</div>}
+          {!ready && !broken && <div className="scene-loading muted">Starting the 3D scene…</div>}
+          {broken && (
+            <div className="scene-broken" role="alert">
+              <p>The 3D scene stopped working and could not be started again.</p>
+              <p className="muted">{broken}</p>
+              <button type="button" className="primary" onClick={() => window.location.reload()}>
+                Reload the page
+              </button>
+            </div>
+          )}
 
           <div className="notices" aria-live="polite">
             {store.error && <div className="notice">{store.error.message}</div>}
@@ -390,7 +448,8 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
             </span>
             {showFps && stats && (
               <span className="pill" data-testid="fps">
-                {stats.fps.toFixed(0)} fps · {stats.frameMs.toFixed(1)} ms
+                {stats.fps.toFixed(0)} fps · {stats.frameMs.toFixed(1)} ms · {stats.quality}
+                {stats.detail === null ? '' : ` · detail ${stats.detail}`}
               </span>
             )}
           </div>

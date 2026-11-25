@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mockBackend } from './mocks';
+import { aircraft, mockBackend } from './mocks';
 
 /**
  * Smoke test: loads /KLAF with every network dependency mocked (REST API and WebSocket feed) and checks
@@ -60,6 +60,100 @@ test('aircraft from the feed appear in the 3D scene', async ({ page }) => {
   await expect(panel.getByRole('button', { name: 'Follow' })).toBeEnabled();
 
   await expect(page.getByText('Not for navigation or operational use.')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('the scene keeps drawing when an aircraft leaves and another takes its place', async ({ page }) => {
+  // Two aircraft in the same phase, then one of them goes, then a third arrives in that phase. Trails of
+  // one phase look the same, and once shared a Cesium object that left with the first aircraft.
+  const errors: string[] = [];
+  page.on('pageerror', (err) => errors.push(err.message));
+  const second = (at: number, step: number, hex: string) => ({
+    ...aircraft(at, step)[2],
+    hex,
+    callsign: `N${hex}`,
+    registration: `N${hex}`,
+    lat: 40.404,
+  });
+  await mockBackend(page, {
+    delta: (at, step) => ({
+      upserts: [
+        ...aircraft(at, step),
+        ...(step < 8 ? [second(at, step, 'aaaaa1')] : []),
+        ...(step > 12 ? [second(at, step, 'aaaaa2')] : []),
+      ],
+      removed: step === 8 ? ['aaaaa1'] : [],
+    }),
+  });
+  await page.goto('/KLAF');
+  await expect(page.getByTestId('airport-page')).toHaveAttribute('data-ready', 'true', { timeout: 60_000 });
+  const visible = (hex: string) => page.evaluate((h) => window.__towercab?.drawn(h)?.visible ?? false, hex);
+  await page.evaluate(() => {
+    (window.__towercab as unknown as { first?: boolean }).first = true;
+  });
+  await expect.poll(() => visible('aaaaa1'), { timeout: 30_000 }).toBe(true);
+  await expect.poll(() => visible('aaaaa1'), { timeout: 30_000 }).toBe(false);
+  await expect.poll(() => visible('aaaaa2'), { timeout: 30_000 }).toBe(true);
+  await page.waitForTimeout(3000);
+
+  await expect(page.locator('.cesium-widget-errorPanel')).toHaveCount(0);
+  const at = () => page.evaluate(() => window.__towercab?.drawn('a2eea2')?.lon ?? 0);
+  const before = await at();
+  await page.waitForTimeout(2500);
+  expect(await at()).toBeLessThan(before);
+  // It was never built again to get here, which would hide a failure.
+  expect(await page.evaluate(() => (window.__towercab as unknown as { first?: boolean }).first)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('following goes on while others leave, and ends when the followed aircraft does', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (err) => errors.push(err.message));
+  // Two in the pattern; the one that is not followed goes first, then the followed one.
+  const other = (at: number, step: number) => ({
+    ...aircraft(at, step)[2],
+    hex: 'aaaaa1',
+    callsign: 'NOTHER',
+    lat: 40.404,
+  });
+  await mockBackend(page, {
+    delta: (at, step) => ({
+      upserts: [
+        ...aircraft(at, step).filter((a) => a.hex !== 'a2eea2' || step < 18),
+        ...(step < 8 ? [other(at, step)] : []),
+      ],
+      removed: step === 8 ? ['aaaaa1'] : step === 18 ? ['a2eea2'] : [],
+    }),
+  });
+  await page.goto('/KLAF');
+  await expect(page.getByTestId('airport-page')).toHaveAttribute('data-ready', 'true', { timeout: 60_000 });
+  const visible = (hex: string) => page.evaluate((h) => window.__towercab?.drawn(h)?.visible ?? false, hex);
+  await expect.poll(() => visible('aaaaa1'), { timeout: 30_000 }).toBe(true);
+  await page.evaluate(() => window.__towercab?.follow('a2eea2'));
+  await expect(page).toHaveURL(/view=follow/);
+
+  // Any scene but this one would mean that it failed and was built again.
+  await page.evaluate(() => {
+    (window.__towercab as unknown as { first?: boolean }).first = true;
+  });
+  await expect.poll(() => visible('aaaaa1'), { timeout: 30_000 }).toBe(false);
+  await page.waitForTimeout(2000);
+  expect(await page.evaluate(() => window.__towercab?.view)).toBe('follow');
+  const at = () => page.evaluate(() => window.__towercab?.drawn('a2eea2')?.lon ?? 0);
+  const before = await at();
+  await page.waitForTimeout(2000);
+  expect(await at()).toBeLessThan(before);
+
+  await expect.poll(() => visible('a2eea2'), { timeout: 30_000 }).toBe(false);
+  await expect(page.getByTestId('selection-panel')).toHaveCount(0);
+  expect(await page.evaluate(() => window.__towercab?.view)).toBe('free');
+  // The others are still there and still moving.
+  expect(await visible('abca1f')).toBe(true);
+  expect(
+    await page.evaluate(() => (window.__towercab as unknown as { first?: boolean }).first),
+    'the scene was built again',
+  ).toBe(true);
+  await expect(page.locator('.cesium-widget-errorPanel')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

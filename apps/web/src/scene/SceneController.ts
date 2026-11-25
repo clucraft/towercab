@@ -19,6 +19,7 @@ import {
   LabelStyle,
   Matrix4,
   PerspectiveFrustum,
+  RequestScheduler,
   SceneTransforms,
   ScreenSpaceEventHandler,
   ScreenSpaceEventType,
@@ -35,6 +36,7 @@ import { FlatGround, type GroundSampler, ProbedGround, SampledGround } from './g
 import { LabelOverlay } from './labelOverlay';
 import { LayoutLayer } from './layoutLayer';
 import { SCHEMATIC } from './palette';
+import { DetailGovernor, PROFILES, type Quality, type QualityProfile } from './quality';
 import { TrailLayer } from './trails';
 import { buildViewPresets, resolveView, type ViewPreset } from './views';
 
@@ -49,6 +51,15 @@ export interface SceneCallbacks {
   onNotice?(text: string): void;
   /** A camera's view cone was clicked. */
   onCameraPick?(id: string): void;
+  /** The scene can no longer draw. It has to be destroyed and built again. Called once at most. */
+  onFailed?(failure: SceneFailure): void;
+}
+
+export interface SceneFailure {
+  /** `context`: the browser took the graphics context away, which on phones mostly means "out of memory". */
+  kind: 'render' | 'context';
+  message: string;
+  mode: SceneMode;
 }
 
 export interface SceneOptions {
@@ -58,6 +69,8 @@ export interface SceneOptions {
   store: LiveStore;
   mode: SceneMode;
   view: string | null;
+  /** How much the scene may cost. The default is `high`. */
+  quality?: Quality;
   callbacks?: SceneCallbacks;
 }
 
@@ -68,6 +81,9 @@ export interface SceneStats {
   scriptMs: number;
   aircraft: number;
   mode: SceneMode;
+  quality: Quality;
+  /** The tiles' screen-space error in force: larger is coarser. Null when no tiles are loaded. */
+  detail: number | null;
 }
 
 /**
@@ -89,6 +105,12 @@ const FLY_SECONDS = 1.2;
 const CONE_RETRY_MS = 1500;
 /** Distance from a camera at which its pose handles are drawn in the pose editor, metres. */
 const HANDLE_RANGE_M = 260;
+/** With the view still and every tile there for this long, the tiles are no longer walked each frame. */
+const REST_AFTER_MS = 1200;
+/** The 3D camera stays this far above the surface in Photoreal, metres. */
+const CAMERA_CLEARANCE_M = 4;
+/** Where the surface under the 3D camera is not known, it may be this far below where it last was, metres. */
+const CAMERA_FALL_M = 5;
 
 /** What the 3D view is doing when it looks through a camera. */
 interface Matched {
@@ -158,11 +180,26 @@ export class SceneController {
   private lastConeCheckAt = 0;
   private poseEdit: PoseEdit | null = null;
   private dragging: 'aim' | 'fov' | null = null;
+  private failed = false;
+  private readonly profile: QualityProfile;
+  private readonly governor: DetailGovernor;
+  /** The view in the last frame, to tell whether it is still. */
+  private readonly lastView = new Matrix4();
+  private lastViewKey = '';
+  private stillSince = 0;
+  /** The surface last found under the 3D camera. */
+  private cameraSurface: number | null = null;
+  /** The 3D camera was moved by hand since it was last put somewhere. */
+  private userMoved = false;
+  /** ...and has been clear of the surface since. One that was put inside a building (the tower) has not. */
+  private clearOfSurface = false;
 
   private constructor(private readonly options: SceneOptions) {
     const { container, airport, config } = options;
     this.airport = airport;
     this.callbacks = options.callbacks ?? {};
+    this.profile = PROFILES[options.quality ?? 'high'];
+    this.governor = new DetailGovernor(this.profile.steps.length, this.profile.start);
     this.presets = buildViewPresets(airport);
     if (config.cesiumIonToken) Ion.defaultAccessToken = config.cesiumIonToken;
 
@@ -181,11 +218,19 @@ export class SceneController {
       baseLayer: false,
       scene3DOnly: true,
       shadows: false,
-      msaaSamples: 4,
+      msaaSamples: this.profile.msaaSamples,
+      orderIndependentTranslucency: this.profile.orderIndependentTranslucency,
+      // A render error is reported to the page, which builds the scene again; see `fail`.
+      showRenderLoopErrors: false,
       // Render at CSS resolution: a 4K laptop screen would otherwise cost four times the fill rate.
       useBrowserRecommendedResolution: true,
     });
     const { scene } = this.viewer;
+    RequestScheduler.maximumRequests = this.profile.maximumRequests;
+    scene.renderError.addEventListener(this.onRenderError);
+    scene.canvas.addEventListener('webglcontextlost', this.onContextLost);
+    scene.canvas.addEventListener('pointerdown', this.onUserInput);
+    scene.canvas.addEventListener('wheel', this.onUserInput, { passive: true });
     scene.globe.baseColor = Color.fromCssColorString(SCHEMATIC.ground);
     scene.globe.depthTestAgainstTerrain = true;
     scene.fog.enabled = false;
@@ -239,6 +284,7 @@ export class SceneController {
     }, ScreenSpaceEventType.MOUSE_MOVE);
 
     scene.preUpdate.addEventListener(this.onFrame);
+    scene.preRender.addEventListener(this.onBeforeRender);
     scene.postRender.addEventListener(this.onRendered);
 
     this.unlisten = options.store.listen({
@@ -320,6 +366,12 @@ export class SceneController {
     const { scene } = this.viewer;
     this.currentMode = mode;
     const photoreal = mode === 'photoreal';
+    this.wakeTiles();
+    this.cameraPlaced();
+    this.governor.reset();
+    this.applyDetail();
+    // `undefined` is how Cesium is told "as fast as the display"; its types leave it out.
+    this.viewer.targetFrameRate = (photoreal ? this.profile.photorealFrameRate : undefined) as number;
     if (this.tileset) this.tileset.show = photoreal;
     scene.globe.show = !photoreal;
     this.layout.show = !photoreal;
@@ -369,6 +421,9 @@ export class SceneController {
     this.clearMatch();
     camera.cancelFlight();
     camera.lookAtTransform(Matrix4.IDENTITY);
+    this.cameraPlaced();
+    // Before the flight: one without a duration is over, and has reported so, by the time it returns.
+    this.currentView = preset.id;
     const groundHeight = this.fieldSceneHeight();
 
     if (preset.kind === 'pose' && preset.pose) {
@@ -403,7 +458,6 @@ export class SceneController {
         camera.flyToBoundingSphere(new BoundingSphere(centre, 1), { offset, duration });
       }
     }
-    this.currentView = preset.id;
     this.callbacks.onView?.(preset.id);
   }
 
@@ -509,6 +563,7 @@ export class SceneController {
     const pose = this.cameras.find((c) => c.id === id)?.pose;
     if (!pose) return;
     const camera = this.viewer.camera;
+    this.cameraPlaced();
     camera.cancelFlight();
     camera.lookAtTransform(Matrix4.IDENTITY);
     this.applyFov();
@@ -662,6 +717,8 @@ export class SceneController {
       scriptMs: scripts.length ? scripts.reduce((a, b) => a + b, 0) / scripts.length : 0,
       aircraft: this.layer.count,
       mode: this.currentMode,
+      quality: this.profile.quality,
+      detail: this.currentMode === 'photoreal' && this.tileset ? this.tileset.maximumScreenSpaceError : null,
     };
   }
 
@@ -684,7 +741,12 @@ export class SceneController {
       () => this.unlisten(),
       () => this.resizeObserver.disconnect(),
       () => this.input.destroy(),
+      () => this.viewer.scene.canvas.removeEventListener('webglcontextlost', this.onContextLost),
+      () => this.viewer.scene.canvas.removeEventListener('pointerdown', this.onUserInput),
+      () => this.viewer.scene.canvas.removeEventListener('wheel', this.onUserInput),
+      () => this.viewer.scene.renderError.removeEventListener(this.onRenderError),
       () => this.viewer.scene.preUpdate.removeEventListener(this.onFrame),
+      () => this.viewer.scene.preRender.removeEventListener(this.onBeforeRender),
       () => this.viewer.scene.postRender.removeEventListener(this.onRendered),
       () => this.ground.dispose(),
       () => this.labels.destroy(),
@@ -717,11 +779,20 @@ export class SceneController {
       if (this.tilesWaitMs > TILES_TIMEOUT_MS) this.photorealFailed('the tiles did not load');
     }
 
-    if (this.ground instanceof ProbedGround) this.ground.beginFrame();
+    if (this.currentMode === 'photoreal' && this.tilesWaitMs === null) {
+      const verdict = this.governor.frame(elapsed, this.tileset?.tilesLoaded === false);
+      if (verdict === 'step') this.applyDetail();
+      else if (verdict === 'struggling') {
+        this.callbacks.onNotice?.('Photoreal is heavy going for this device. Schematic runs much faster.');
+      }
+    }
+
+    if (this.ground instanceof ProbedGround) this.ground.beginFrame(elapsed);
     const { store, config } = this.options;
     const renderTime = store.serverNow() - (store.renderDelayMs() ?? config.renderDelayMs);
     this.layer.update(renderTime, elapsed / 1000);
     if (this.followHex) this.updateFollow();
+    this.keepAboveSurface();
     if (now - this.lastTrailAt >= TRAIL_UPDATE_MS) {
       this.lastTrailAt = now;
       this.trails.update(renderTime, this.layer);
@@ -736,6 +807,116 @@ export class SceneController {
     this.viewer.scene.requestRenderMode = this.layer.count === 0;
     this.scriptThisFrame = performance.now() - now;
   };
+
+  /**
+   * Cesium walks the tree of tiles every frame to decide which to draw, and that walk is most of what Photoreal
+   * costs. While the view is still and everything has arrived the answer cannot change, so the last one is kept.
+   * (`debugFreezeFrame` does exactly this; despite its name it is a public property of the tileset.)
+   */
+  private onBeforeRender = (): void => {
+    const tileset = this.tileset;
+    if (!tileset) return;
+    const { camera, canvas } = this.viewer.scene;
+    const { frustum } = camera;
+    const fov = frustum instanceof PerspectiveFrustum ? frustum.fov : 0;
+    const key = `${fov} ${canvas.width} ${canvas.height}`;
+    const now = performance.now();
+    if (key !== this.lastViewKey || !Matrix4.equals(camera.viewMatrix, this.lastView)) {
+      this.lastViewKey = key;
+      Matrix4.clone(camera.viewMatrix, this.lastView);
+      this.stillSince = now;
+    }
+    if (!tileset.tilesLoaded) this.stillSince = now;
+    // Frozen tiles are not marked as in use. With the cache full, Cesium would unload what is on screen.
+    const room = tileset.totalMemoryUsageInBytes < tileset.cacheBytes;
+    tileset.debugFreezeFrame = tileset.show && room && now - this.stillSince >= REST_AFTER_MS;
+  };
+
+  /** Has the tiles walked again from the next frame on. */
+  private wakeTiles(): void {
+    this.stillSince = performance.now();
+    if (this.tileset) this.tileset.debugFreezeFrame = false;
+  }
+
+  /** Puts the governor's current step into force. */
+  private applyDetail(): void {
+    const step = this.profile.steps[this.governor.current];
+    if (!step) return;
+    const photoreal = this.currentMode === 'photoreal';
+    if (this.tileset) this.tileset.maximumScreenSpaceError = step.error;
+    this.viewer.resolutionScale = photoreal ? step.resolution : 1;
+    this.wakeTiles();
+  }
+
+  /**
+   * Keeps the 3D camera out of the ground in Photoreal. Cesium can do this itself (`enableCollision`), but then
+   * reads whole tiles back from the graphics processor in every frame in which the camera moves, and waits for
+   * them. The sampler used here remembers its answers and limits the time it takes.
+   *
+   * Only what the user does is limited. A preset or a camera's pose may well be inside something: the cab of the
+   * tower is under the tower's roof.
+   */
+  private keepAboveSurface(): void {
+    if (this.currentMode !== 'photoreal' || this.matched || !this.userMoved) return;
+    const camera = this.viewer.camera;
+    const at = camera.positionCartographic;
+    const field = this.fieldSceneHeight();
+    if (at.height > field + SURFACE_SANITY_M + CAMERA_CLEARANCE_M) {
+      this.clearOfSurface = true;
+      return;
+    }
+    const found = this.ground.heightAt(CesiumMath.toDegrees(at.longitude), CesiumMath.toDegrees(at.latitude));
+    if (found !== undefined) this.cameraSurface = found;
+    // Nothing may be loaded under the camera, for instance when it has already gone below the surface.
+    const surface = found ?? (this.cameraSurface ?? field) - CAMERA_FALL_M;
+    const lift = surface + CAMERA_CLEARANCE_M - at.height;
+    if (lift <= 0) {
+      this.clearOfSurface = true;
+      return;
+    }
+    if (found !== undefined && !this.clearOfSurface) return;
+    const raised = Cartesian3.fromRadians(at.longitude, at.latitude, at.height + lift);
+    if (Matrix4.equals(camera.transform, Matrix4.IDENTITY)) {
+      Cartesian3.clone(raised, camera.position);
+      return;
+    }
+    // Orbiting or following: the camera stays turned to what it circles.
+    const transform = Matrix4.clone(camera.transform);
+    const toLocal = Matrix4.inverseTransformation(transform, new Matrix4());
+    camera.lookAtTransform(transform, Matrix4.multiplyByPoint(toLocal, raised, new Cartesian3()));
+  }
+
+  private onUserInput = (): void => {
+    this.userMoved = true;
+  };
+
+  /** The 3D camera has been put somewhere, or is about to be. */
+  private cameraPlaced(): void {
+    this.userMoved = false;
+    this.clearOfSurface = false;
+    this.cameraSurface = null;
+  }
+
+  private onRenderError = (_scene: unknown, error: unknown): void => {
+    this.fail('render', error instanceof Error ? error.message : String(error));
+  };
+
+  private onContextLost = (): void => {
+    this.fail('context', 'the browser took the graphics context away');
+  };
+
+  /** Drawing has stopped for good. Cesium cannot carry on after either of these; the page starts afresh. */
+  private fail(kind: SceneFailure['kind'], message: string): void {
+    if (this.failed || this.destroyed) return;
+    this.failed = true;
+    this.viewer.useDefaultRenderLoop = false;
+    console.error(`TowerCab: the 3D scene stopped (${kind}): ${message}`);
+    const failure: SceneFailure = { kind, message, mode: this.currentMode };
+    // Not from inside Cesium's render loop: the answer is usually to destroy it.
+    setTimeout(() => {
+      if (!this.destroyed) this.callbacks.onFailed?.(failure);
+    }, 0);
+  }
 
   private onRendered = (): void => {
     const started = performance.now();
@@ -837,10 +1018,20 @@ export class SceneController {
       .then(() =>
         createGooglePhotorealistic3DTileset(
           { key: config.googleMapsApiKey ?? undefined, onlyUsingWithGoogleGeocoder: true },
-          // Google's attribution must stay on screen at all times.
-          // `enableCollision` keeps tile geometry available for height queries (and keeps the camera
-          // from going under the surface).
-          { showCreditsOnScreen: true, maximumScreenSpaceError: 16, enableCollision: true },
+          {
+            // Google's attribution must stay on screen at all times.
+            showCreditsOnScreen: true,
+            maximumScreenSpaceError: this.profile.steps[this.profile.start]?.error ?? 16,
+            ...this.profile.tiles,
+            // The default traversal waits for every child of a tile before refining it, and counts an empty
+            // tile out of view as never there. Around the KLAF tower that left a 1.5 km tile in front of
+            // the camera unrefined for good. This one has no such rule, and loads half as many tiles.
+            skipLevelOfDetail: true,
+            // See `keepAboveSurface`. Height queries work without it.
+            enableCollision: false,
+            // Google's tiles are unlit; an environment map would be computed and never seen.
+            environmentMapOptions: { enabled: false },
+          },
         ),
       );
     tilesetRequests = request;
@@ -854,6 +1045,10 @@ export class SceneController {
     this.tilesWaitMs = 0;
     tileset.initialTilesLoaded.addEventListener(() => {
       this.tilesWaitMs = null;
+    });
+    tileset.allTilesLoaded.addEventListener(() => {
+      // What is on screen has just become finer; heights read from the coarser tiles are out of date.
+      if (this.ground instanceof ProbedGround) this.ground.refresh();
     });
     tileset.tileFailed.addEventListener((failure: { message?: string }) => {
       const now = performance.now();
@@ -902,6 +1097,9 @@ export class SceneController {
         },
         // Photogrammetry has lumps where aircraft stood when it was captured.
         smooth: true,
+        probesPerFrame: this.profile.probes.perFrame,
+        share: this.profile.probes.share,
+        ttlMs: this.profile.probes.ttlMs,
       });
     } else if (this.terrain) {
       const terrain = this.terrain;

@@ -24,7 +24,6 @@ interface Trail {
 export class TrailLayer {
   private readonly lines: PolylineCollection;
   private readonly trails = new Map<string, Trail>();
-  private readonly materials = new Map<Phase, Material>();
   private ground: GroundSampler | null = null;
   private toSceneHeight: (ellipsoidM: number) => number = (h) => h;
   private fallbackGround = 0;
@@ -114,13 +113,13 @@ export class TrailLayer {
         continue;
       }
       if (!trail.line) {
-        trail.line = this.lines.add({ positions, width: 2, material: this.material(drawn.data.phase) });
+        trail.line = this.lines.add({ positions, width: 2, material: lineMaterial(drawn.data.phase) });
         trail.phase = drawn.data.phase;
       } else {
         trail.line.positions = positions;
         trail.line.show = true;
         if (trail.phase !== drawn.data.phase) {
-          trail.line.material = this.material(drawn.data.phase);
+          trail.line.material = lineMaterial(drawn.data.phase);
           trail.phase = drawn.data.phase;
         }
       }
@@ -131,15 +130,15 @@ export class TrailLayer {
     this.trails.clear();
     this.scene.primitives.remove(this.lines);
   }
+}
 
-  private material(phase: Phase): Material {
-    let material = this.materials.get(phase);
-    if (!material) {
-      material = Material.fromType('Color', {
-        color: Color.fromCssColorString(PHASE_COLORS[phase]).withAlpha(0.75),
-      });
-      this.materials.set(phase, material);
-    }
-    return material;
-  }
+/**
+ * A material for one line. Never share one between lines: removing a line from a PolylineCollection destroys
+ * its material, and any other line still using it stops the whole scene with "This object was destroyed".
+ * Lines that look the same are drawn together all the same; Cesium groups them by colour, not by object.
+ */
+function lineMaterial(phase: Phase): Material {
+  return Material.fromType('Color', {
+    color: Color.fromCssColorString(PHASE_COLORS[phase]).withAlpha(0.75),
+  });
 }

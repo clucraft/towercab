@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, adminApi, api, type DiscoveryOutcome } from '../api';
 import { type FeedFactory, LiveStore } from '../live/store';
 import { navigate } from '../router';
+import { chooseQuality, readDeviceHints } from '../scene/quality';
 import type { SceneController } from '../scene/SceneController';
 
 const TOKEN_KEY = 'towercab.admin';
@@ -465,6 +466,8 @@ function PoseEditor(props: {
   const sceneRef = useRef<SceneController | null>(null);
   const [airport, setAirport] = useState<AirportDetail | null>(null);
   const [ready, setReady] = useState(false);
+  /** Goes up when the scene has to be built again. */
+  const [generation, setGeneration] = useState(0);
   const [problem, setProblem] = useState<string | null>(null);
   const [looking, setLooking] = useState(false);
   const onDraft = useRef(props.onDraft);
@@ -498,7 +501,17 @@ function PoseEditor(props: {
               ? 'photoreal'
               : 'schematic',
           view: 'overhead',
-          callbacks: { onNotice: (text) => !cancelled && setProblem(text) },
+          quality: chooseQuality(readDeviceHints()),
+          callbacks: {
+            onNotice: (text) => !cancelled && setProblem(text),
+            // Nothing is lost by it here: drafts live in the page, not in the scene.
+            onFailed: (failure) => {
+              if (cancelled) return;
+              // Twice is chance, more is not.
+              if (generation < 2) setGeneration(generation + 1);
+              else setProblem(`The 3D view stopped: ${failure.message}. Reload the page.`);
+            },
+          },
         }),
       )
       .then((created) => {
@@ -516,7 +529,7 @@ function PoseEditor(props: {
       sceneRef.current = null;
       setReady(false);
     };
-  }, [airport]);
+  }, [airport, generation]);
 
   // A pose that has never been set starts at the middle of the field.
   const unplaced = editing !== null && editing.draft.lat === 0 && editing.draft.lon === 0;

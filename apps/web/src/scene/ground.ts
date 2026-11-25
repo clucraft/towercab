@@ -195,9 +195,20 @@ export interface ProbedGroundOptions {
   retryMs?: number;
   /** Probes allowed between two calls of `beginFrame`: a cap on what a single frame may cost. */
   probesPerFrame?: number;
+  /**
+   * The share of all time that probes may take, 0 to 1. A probe reads tile geometry back from the graphics
+   * processor and waits for it: nothing on a desktop, much of a frame on a phone. Where probes are slow there
+   * are simply fewer of them. No limit when left out.
+   */
+  share?: number;
   maxCells?: number;
   now?: () => number;
 }
+
+/** The part of a frame's probes that only places never read before may use. */
+const NEW_CELLS_SHARE = 0.5;
+/** Probe time that may be saved up, so that a few aircraft appearing at once are placed without delay. */
+const MAX_CREDIT_MS = 12;
 
 /**
  * A surface that can be read synchronously from what is currently loaded (3D tiles). Reading is cheap but
@@ -212,10 +223,13 @@ export class ProbedGround implements GroundSampler {
   private readonly probesPerFrame: number;
   private readonly maxCells: number;
   private readonly now: () => number;
+  private readonly share: number;
   private budget: number;
+  private credit = MAX_CREDIT_MS;
   private probes = 0;
 
   constructor(private readonly options: ProbedGroundOptions) {
+    this.share = options.share ?? Number.POSITIVE_INFINITY;
     this.cellDeg = options.cellDeg ?? 0.00009;
     this.smooth = options.smooth ?? false;
     this.ttlMs = options.ttlMs ?? 20_000;
@@ -236,9 +250,15 @@ export class ProbedGround implements GroundSampler {
     return this.probes;
   }
 
-  /** Call once per frame: renews the allowance of probes. */
-  beginFrame(): void {
+  /** Call once per frame, with the time since the last one: renews the allowance of probes. */
+  beginFrame(elapsedMs = 16): void {
     this.budget = this.probesPerFrame;
+    this.credit = Math.min(MAX_CREDIT_MS, this.credit + Math.min(elapsedMs, 250) * this.share);
+  }
+
+  /** The surface has changed: read every height again when it is next asked for. The old ones serve until then. */
+  refresh(): void {
+    for (const entry of this.cache.values()) entry.until = 0;
   }
 
   heightAt(lon: number, lat: number): number | undefined {
@@ -278,10 +298,14 @@ export class ProbedGround implements GroundSampler {
     const now = this.now();
     if (entry && now < entry.until) return entry.height;
     // Out of allowance for this frame: keep using the old answer, and ask again next frame.
-    if (this.budget <= 0) return entry?.height;
+    if (this.budget <= 0 || this.credit <= 0) return entry?.height;
+    // Part of the allowance is kept for places never read before: an aircraft rolling out needs those now,
+    // while an old answer is still a good one.
+    if (entry && this.budget <= this.probesPerFrame * NEW_CELLS_SHARE) return entry.height;
     this.budget -= 1;
     this.probes += 1;
     const height = this.options.probe(column * lonCell, row * this.cellDeg);
+    this.credit -= this.now() - now;
     const valid = typeof height === 'number' && Number.isFinite(height);
     if (!entry && this.cache.size >= this.maxCells) this.cache.clear();
     // Spread the expiry a little, so a row of parked aircraft is not re-read in the same frame.

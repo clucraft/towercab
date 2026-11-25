@@ -87,7 +87,14 @@ export const CLIENT_CONFIG = {
   version: 'e2e',
   cesiumIonToken: null,
   googleMapsApiKey: null,
-  features: { photoreal: false, terrain: false, cameras: false, admin: false, photos: false },
+  features: {
+    photoreal: false,
+    terrain: false,
+    cameras: false,
+    admin: false,
+    photos: false,
+    typePhotos: false,
+  },
   renderDelayMs: 2500,
   attributions: [{ name: 'adsb.fi', url: 'https://adsb.fi', note: 'open data' }],
 };
@@ -183,7 +190,11 @@ export function aircraft(at: number, step: number) {
 
 export async function mockBackend(
   page: Page,
-  options: { features?: Partial<(typeof CLIENT_CONFIG)['features']> } = {},
+  options: {
+    features?: Partial<(typeof CLIENT_CONFIG)['features']>;
+    /** What each one-second update carries. The default moves the three aircraft along. */
+    delta?: (at: number, step: number) => { upserts: unknown[]; removed: string[] };
+  } = {},
 ): Promise<{ subscribed: () => string[] }> {
   const subscriptions: string[] = [];
   await page.route('**/api/client-config', (route) =>
@@ -258,16 +269,8 @@ export async function mockBackend(
       timer = setInterval(() => {
         seq += 1;
         const t = Date.now();
-        socket.send(
-          JSON.stringify({
-            type: 'delta',
-            serverTime: t,
-            icao: message.icao,
-            seq,
-            upserts: aircraft(t - 400, seq),
-            removed: [],
-          }),
-        );
+        const delta = options.delta?.(t - 400, seq) ?? { upserts: aircraft(t - 400, seq), removed: [] };
+        socket.send(JSON.stringify({ type: 'delta', serverTime: t, icao: message.icao, seq, ...delta }));
       }, 1000);
     });
     socket.onClose(() => clearInterval(timer));
@@ -281,6 +284,7 @@ export interface SceneHandle {
     hex: string,
   ): { visible: boolean; lat: number; lon: number; height: number; onGround: boolean } | undefined;
   select(hex: string | null): void;
+  follow(hex: string): void;
   readonly view: string;
   readonly matchedCamera: string | null;
   poseHandleAt(which: 'aim' | 'fov'): { x: number; y: number } | null;

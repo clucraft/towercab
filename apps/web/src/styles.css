@@ -424,11 +424,24 @@ a.link {
   pointer-events: none;
 }
 
-.scene-loading {
+.scene-loading,
+.scene-broken {
   position: absolute;
   inset: 0;
   display: grid;
   place-content: center;
+}
+
+.scene-broken {
+  justify-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  text-align: center;
+  background: var(--bg);
+}
+
+.scene-broken p {
+  margin: 0;
 }
 
 /* Imagery credits (Cesium, Google) must stay visible: keep them clear of our own controls. */
@@ -550,13 +563,20 @@ a.link {
 .photo img {
   display: block;
   width: 100%;
+  height: auto;
   border-radius: 6px;
+  background: var(--panel-2);
 }
 
 .photo figcaption {
   margin-top: 0.2rem;
   color: var(--muted);
   font-size: 0.75rem;
+}
+
+.photo figcaption strong {
+  color: var(--text);
+  font-weight: 600;
 }
 
 .photo a {
@@ -905,18 +925,29 @@ dl.facts dd {
     right: auto;
     left: 0.4rem;
     width: min(16rem, 60vw);
-    max-height: calc(100% - 0.8rem);
+    /* Ends above the imagery credits. */
+    max-height: calc(100% - 3.8rem);
     padding: 0.5rem;
   }
 
-  .selection .photo {
-    display: none;
+  /* A strip rather than the whole picture: there is little room, and the details matter more. */
+  .selection .photo img {
+    max-height: 6.5rem;
+    object-fit: cover;
   }
 
+  /* Not at the bottom, which belongs to the imagery credits, and not where the selected aircraft's panel goes. */
   .badges {
-    top: auto;
-    bottom: 1.6rem;
-    left: max(0.4rem, env(safe-area-inset-left));
+    top: 0.4rem;
+    right: max(0.4rem, env(safe-area-inset-right));
+    left: auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 40vw;
+  }
+
+  .notices {
+    top: 2.4rem;
   }
 
   .attribution {
@@ -1203,6 +1234,13 @@ img.camera-media {
 /* Imagery credits stay readable whatever is drawn over the scene. */
 .scene .cesium-viewer-bottom {
   z-index: 3;
+}
+
+/* Over the aircraft labels, under the credits. */
+.notices,
+.badges,
+.selection {
+  z-index: 2;
 }
 
 .camera-overlay-bar {
