@@ -781,9 +781,14 @@ shared by everyone whose tiles come through ion, and a few minutes later tiles c
 a used up quota, said so and went to Schematic; and since Cesium never asks again for a tile that failed, Photoreal stayed
 empty in places when switched on again.
 
-Now a refused tile is asked for again after 15, 30, 60 and 120 s. A scene that is there stays, with parts missing. One
-of which most is missing after 25 s gives way to Schematic, with the reason, and switching to Photoreal asks again at
-once. Only refusals that go on through all of that are called a quota. Cesium has `Resource.retryCallback` for this, but
-it cannot be reached through `createGooglePhotorealistic3DTileset`: the first tiles exist before there is a resource to
-set it on. So the failed tiles are marked as not loaded, which is not public; a test fails when an upgrade changes it.
-Tried in a browser with Google's answers replaced by 429: from the start for ten seconds, for good, and while turning.
+Now a refused tile is asked for again after 3, 12, 30, 60 and then every 120 s, and nothing is said about it unless it lasts:
+at first a notice came with any refusal, and one tile in hundreds does not deserve it. There is a notice when a tile
+is refused for the third time (after 15 s), or for the second while more tiles are missing than drawn. Every tile has
+its own count, so refusals of different tiles that each came a moment later do not add up. A scene that is there stays,
+with parts missing. One of which most is missing after 25 s gives way to Schematic, with the reason, and switching to
+Photoreal asks again at once. Only when most of it is refused through all of that is it called a quota.
+
+Cesium has `Resource.retryCallback` for this, but it cannot be reached through `createGooglePhotorealistic3DTileset`: the first
+tiles exist before there is a resource to set it on. So the failed tiles are marked as not loaded, which is not public;
+a test fails when an upgrade changes it. Tried in a browser with Google's answers replaced by 429: from the start for ten
+seconds, for good, while turning, and one tile in thirty.

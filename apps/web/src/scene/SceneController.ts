@@ -201,6 +201,8 @@ export class SceneController {
   private tileFailures: number[] = [];
   private readonly refusals = new TileRefusals();
   private tilesArrived = 0;
+  /** The scene has been there once, if with parts missing. */
+  private tilesHere = false;
   /** Rendering time spent waiting for the first tiles, or null when not waiting. */
   private tilesWaitMs: number | null = null;
   private destroyed = false;
@@ -400,9 +402,9 @@ export class SceneController {
     this.viewer.targetFrameRate = (photoreal ? this.profile.photorealFrameRate : undefined) as number;
     if (this.tileset) this.tileset.show = photoreal;
     // Someone who switches to Photoreal again wants the tiles that were refused the last time.
-    if (photoreal && this.refusals.missing > 0) {
-      this.tilesWaitMs = 0;
-      this.askAgain(this.refusals.restart(performance.now()));
+    if (photoreal && this.tileset) {
+      if (!this.tilesHere) this.tilesWaitMs = 0;
+      this.askAgain(this.refusals.restart());
     }
     scene.globe.show = !photoreal;
     this.layout.show = !photoreal;
@@ -1143,7 +1145,10 @@ export class SceneController {
     });
     tileset.allTilesLoaded.addEventListener(() => {
       // To Cesium a tile that failed is done with. A scene that is mostly missing has not arrived.
-      if (this.tilesArrived >= this.refusals.missing) this.tilesWaitMs = null;
+      if (this.tilesArrived >= this.refusals.missing) {
+        this.tilesWaitMs = null;
+        this.tilesHere = true;
+      }
       // What is on screen has just become finer; heights read from the coarser tiles are out of date.
       if (this.ground instanceof ProbedGround) this.ground.refresh();
     });
@@ -1169,8 +1174,10 @@ export class SceneController {
   /** Too many requests: mostly a limit per minute, which is over soon. The tiles are asked for again by and by. */
   private tileRefused(url: string, now: number): void {
     if (this.destroyed || this.currentMode !== 'photoreal') return;
-    const answer = this.refusals.refused(url, now);
-    if (answer === 'first') {
+    // The tiles in use are not public; see `tileSurface.ts`.
+    const drawn = (this.tileset as unknown as { _selectedTiles?: unknown[] } | null)?._selectedTiles?.length;
+    const answer = this.refusals.refused(url, now, drawn ?? 0);
+    if (answer === 'tell') {
       this.callbacks.onNotice?.(
         'Google is limiting requests just now, so parts of the scene are missing. Asking again soon.',
       );
@@ -1180,7 +1187,7 @@ export class SceneController {
   }
 
   private askAgain(urls: ReadonlySet<string>): void {
-    if (!this.tileset) return;
+    if (!this.tileset || urls.size === 0) return;
     askAgain(this.tileset.root as unknown as RetryTile, urls);
     this.wakeTiles();
     this.viewer.scene.requestRender();
