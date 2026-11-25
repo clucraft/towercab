@@ -241,7 +241,7 @@ Read on 2026-11-24 (<https://developers.google.com/maps/documentation/tile/polic
 With `GOOGLE_MAPS_API_KEY` the tiles come straight from the Map Tiles API; otherwise through Cesium ion
 (`createGooglePhotorealistic3DTileset`, signature checked in CesiumJS 1.147). The scene falls back to
 Schematic with a notice when: the tileset cannot be created; a tile request is refused (401, 403) or over
-quota (429); twelve tiles fail within 20 s; or no tiles have arrived after 25 s of rendering. That last
+quota (429, see D-083); twelve tiles fail within 20 s; or no tiles have arrived after 25 s of rendering. That last
 timer counts rendered frames only, so a tab left in the background does not trip it.
 
 ### D-034 Surface heights: read from loaded tiles, not `sampleHeightMostDetailed` (Deviation)
@@ -759,3 +759,31 @@ also have more than 30 times the error allowed on the screen are not drawn now. 
 below the horizon stayed covered from 60 m to 60 km up, settled and turning, at KLAF and KIND. (Loading only tiles of the
 wanted detail, a public option, left one wall in five. Without `skipLevelOfDetail` there is none, and the blur of D-073
 is back.) It uses the tile's model and screen error, which are not public; without them it does nothing.
+
+### D-081 Airport vehicles are not aircraft (Fix)
+
+At KDEN adsb.fi has five airport vehicles among 53 tracks ("OPS 8", emitter category C1, one with the type `SERV`). They
+were drawn as vehicles but listed as aircraft, and at 46 kt on a service road as a departing one. Categories C1 and C2 now
+have a phase of their own, `vehicle`, whatever they do; they are always on the ground, listed last and not counted. A known
+aircraft type beats the category, for transponders that are set up wrong.
+
+### D-082 The FAA's diagrams only where the FAA has them (Fix)
+
+The default link to the FAA's airport diagrams was there for every airport, Singapore included. It now depends on the
+country in OurAirports: the FAA's page offers the states, Puerto Rico, the Virgin Islands and the Pacific territories
+(looked at on 2026-11-25). Anywhere else there is a diagram only when the config links one.
+
+### D-083 Google's limit per minute is waited out (Fix)
+
+On 2026-11-25 Google answered 429 for tiles: `Quota exceeded for quota metric '3D Tiles renderer requests' and limit '3D
+Tiles renderer requests per minute'`, with a limit of 150,000 for the project. The project is Cesium ion's, so the limit is
+shared by everyone whose tiles come through ion, and a few minutes later tiles came again. TowerCab took any 429 for
+a used up quota, said so and went to Schematic; and since Cesium never asks again for a tile that failed, Photoreal stayed
+empty in places when switched on again.
+
+Now a refused tile is asked for again after 15, 30, 60 and 120 s. A scene that is there stays, with parts missing. One
+of which most is missing after 25 s gives way to Schematic, with the reason, and switching to Photoreal asks again at
+once. Only refusals that go on through all of that are called a quota. Cesium has `Resource.retryCallback` for this, but
+it cannot be reached through `createGooglePhotorealistic3DTileset`: the first tiles exist before there is a resource to
+set it on. So the failed tiles are marked as not loaded, which is not public; a test fails when an upgrade changes it.
+Tried in a browser with Google's answers replaced by 429: from the start for ten seconds, for good, and while turning.

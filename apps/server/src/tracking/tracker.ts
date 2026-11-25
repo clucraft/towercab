@@ -4,6 +4,7 @@ import {
   distanceM,
   distanceNm,
   estimateAltitude,
+  isGroundVehicle,
   type Phase,
   type Runway,
   type TrailPoint,
@@ -257,13 +258,17 @@ export class AirportTracker {
     });
     const overRunway = runwayAt(obs.lat, obs.lon, ctx.runways) !== null;
     track.overRunway = overRunway;
-    const onGround = isOnGround({
-      altBaro: obs.altBaro,
-      altMslFt: estimate.mslFt,
-      gsKt: obs.gsKt,
-      fieldElevationFt: ctx.elevationFt,
-      overRunway,
-    });
+    // Vehicles do 50 kt on the service roads, which is a take-off roll for anything with wings.
+    const vehicle = isGroundVehicle(obs);
+    const onGround =
+      vehicle ||
+      isOnGround({
+        altBaro: obs.altBaro,
+        altMslFt: estimate.mslFt,
+        gsKt: obs.gsKt,
+        fieldElevationFt: ctx.elevationFt,
+        overRunway,
+      });
     // An airborne aircraft with no altitude at all cannot be placed in the scene.
     if (!onGround && estimate.ellipsoidM == null) return null;
 
@@ -284,21 +289,23 @@ export class AirportTracker {
     }
     track.heading = resolveHeading(track.heading, obs.trueHeadingDeg, trackDeg, obs.gsKt);
     const vertRateFpm = obs.baroRateFpm ?? obs.geomRateFpm;
-    const phase: Phase = classifyPhase(
-      {
-        onGround,
-        lat: obs.lat,
-        lon: obs.lon,
-        gsKt: obs.gsKt,
-        trackDeg: trackDeg ?? track.heading,
-        vertRateFpm,
-        aglFt: onGround ? 0 : aglFt,
-        distNm,
-        runways: ctx.runways,
-        time: obs.posTime,
-      },
-      track.memory,
-    );
+    const phase: Phase = vehicle
+      ? 'vehicle'
+      : classifyPhase(
+          {
+            onGround,
+            lat: obs.lat,
+            lon: obs.lon,
+            gsKt: obs.gsKt,
+            trackDeg: trackDeg ?? track.heading,
+            vertRateFpm,
+            aglFt: onGround ? 0 : aglFt,
+            distNm,
+            runways: ctx.runways,
+            time: obs.posTime,
+          },
+          track.memory,
+        );
 
     const aircraft: Aircraft = {
       hex: obs.hex,

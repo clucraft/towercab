@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 /**
  * What an aircraft is doing relative to the airport. The build prompt lists seven phases; `transit` is added
- * for traffic inside the geofence that is neither arriving, departing nor in the pattern.
+ * for traffic inside the geofence that is neither arriving, departing nor in the pattern, and `vehicle` for the
+ * cars and trucks that carry a transponder at large airports, whatever they do.
  */
 export const PHASES = [
   'parked',
@@ -13,6 +14,7 @@ export const PHASES = [
   'landing_roll',
   'pattern',
   'transit',
+  'vehicle',
 ] as const;
 export const PhaseSchema = z.enum(PHASES);
 export type Phase = z.infer<typeof PhaseSchema>;
@@ -26,6 +28,7 @@ export const PHASE_LABELS: Record<Phase, string> = {
   landing_roll: 'Landing roll',
   pattern: 'Pattern',
   transit: 'Transit',
+  vehicle: 'Vehicle',
 };
 
 export const AltitudeSourceSchema = z.enum(['geom', 'baro-qnh', 'baro-std', 'ground', 'none']);

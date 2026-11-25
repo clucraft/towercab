@@ -72,3 +72,8 @@ export function resolveAircraftType(
   if (byCategory) return { ...byCategory, matched: 'category' };
   return { ...GENERIC, matched: 'generic' };
 }
+
+/** Whether this is an airport vehicle (ADS-B emitter categories C1 and C2) and not an aircraft. */
+export function isGroundVehicle(of: { typeCode?: string; category?: string }): boolean {
+  return resolveAircraftType(of.typeCode, of.category).class === 'ground-vehicle';
+}

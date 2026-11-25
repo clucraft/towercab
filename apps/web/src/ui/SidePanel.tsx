@@ -30,7 +30,7 @@ interface Props {
   onClose(): void;
 }
 
-/** The list groups, in the order a controller would care about them. */
+/** The list groups, in the order a controller would care about them. Vehicles come after, on their own. */
 const GROUPS: { title: string; phases: Phase[] }[] = [
   { title: 'Departing', phases: ['takeoff_roll', 'departing'] },
   { title: 'Arriving', phases: ['arriving', 'landing_roll'] },
@@ -38,7 +38,15 @@ const GROUPS: { title: string; phases: Phase[] }[] = [
   { title: 'Taxiing', phases: ['taxiing'] },
   { title: 'Parked', phases: ['parked'] },
   { title: 'Passing through', phases: ['transit'] },
+  { title: 'Vehicles', phases: ['vehicle'] },
 ];
+
+/** How many aircraft there are. The vehicles that are tracked along with them do not count. */
+export function countAircraft(tracked: Iterable<Aircraft>): number {
+  let n = 0;
+  for (const a of tracked) if (a.phase !== 'vehicle') n += 1;
+  return n;
+}
 
 function age(now: number, then: number | undefined): string {
   if (then === undefined) return 'never';
@@ -177,6 +185,7 @@ export function SidePanel({
 }: Props) {
   const sources = status?.providers.filter((p) => p.enabled) ?? [];
   const byLabel = (a: Aircraft, b: Aircraft) => aircraftLabel(a).localeCompare(aircraftLabel(b));
+  const count = countAircraft(aircraft);
 
   return (
     <aside className="side-panel" data-testid="side-panel" aria-label="Airport information">
@@ -192,11 +201,9 @@ export function SidePanel({
 
       <details open>
         <summary>
-          Aircraft <span className="count">{aircraft.length}</span>
+          Aircraft <span className="count">{count}</span>
         </summary>
-        {aircraft.length === 0 && (
-          <p className="muted">No aircraft inside {airport.radiusNm} NM right now.</p>
-        )}
+        {count === 0 && <p className="muted">No aircraft inside {airport.radiusNm} NM right now.</p>}
         {GROUPS.map((group) => {
           const members = aircraft.filter((a) => group.phases.includes(a.phase)).sort(byLabel);
           if (members.length === 0) return null;

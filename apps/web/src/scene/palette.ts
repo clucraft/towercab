@@ -10,6 +10,7 @@ export const PHASE_COLORS: Record<Phase, string> = {
   landing_roll: '#c084fc',
   pattern: '#2dd4bf',
   transit: '#e6edf3',
+  vehicle: '#b8a98a',
 };
 
 /** The dark schematic palette: works at night, keeps aircraft and labels the brightest things on screen. */

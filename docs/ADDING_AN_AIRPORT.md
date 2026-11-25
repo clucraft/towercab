@@ -43,7 +43,8 @@ airports:
     # For the clock, sunrise and sunset in the side panel. Found from the position when left out.
     timezone: America/Indiana/Indianapolis
 
-    # Override the links in the side panel (liveatc, diagram, flightaware).
+    # Override the links in the side panel (liveatc, diagram, flightaware). Outside the United States there is no
+    # airport diagram unless you link one here.
     links:
       liveatc: "https://www.liveatc.net/search/?icao=KLAF"
 ```
@@ -68,12 +69,51 @@ lists control towers with surveyed positions and heights; that is where the valu
 example config come from. `heightM` is the height of the controllers' eyes above the ground, a little below
 the top of the structure. Mark it `approximate: true` unless you surveyed it.
 
+Look at the result in Photoreal. Where Google has the tower in 3D, the camera can end up inside it, with walls all
+around: raise `heightM` a few metres above the structure, as for KMDW below.
+
+### Airports that were tried
+
+These were looked at in both base maps on 2026-11-25. The towers are from the FAA Digital Obstacle File of 2026-11-22;
+Singapore's comes from OpenStreetMap.
+
+```yaml
+- icao: KORD # Chicago O'Hare. OAS 17-002277, 259 ft AGL
+  radiusNm: 8
+  ceilingFtAgl: 6000
+  tower: { lat: 41.975961, lon: -87.903258, heightM: 72, approximate: true }
+  defaultView: tower
+- icao: KMDW # Chicago Midway. OAS 17-002320, 141 ft AGL; at 36 m the camera is inside the tower
+  tower: { lat: 41.780219, lon: -87.752419, heightM: 46, approximate: true }
+  defaultView: tower
+- icao: KFWA # Fort Wayne. OAS 18-002642, 208 ft AGL (the file still has an older tower as well)
+  tower: { lat: 40.972117, lon: -85.187733, heightM: 57, approximate: true }
+  defaultView: tower
+- icao: KDEN # Denver. OAS 08-000781, 337 ft AGL
+  radiusNm: 10
+  ceilingFtAgl: 6000
+  tower: { lat: 39.862428, lon: -104.673633, heightM: 96, approximate: true }
+  defaultView: tower
+- icao: WSSS # Singapore Changi. Google has flat pictures there, without buildings
+  radiusNm: 8
+  ceilingFtAgl: 6000
+  defaultView: tower
+```
+
 ### The time zone
 
 The clock, sunrise and sunset in the side panel are in the airport's time zone, found from its position with a small
 table that can be wrong close to the border between two zones: of 32 US airports checked, many of them picked for being
 near one, KTEL was an hour out. If yours is, put its `timezone` in, by its
 [IANA name](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones). The sky does not depend on it.
+
+### Several airports
+
+Only airports that someone is looking at are polled. adsb.fi allows one request a second, which is two airports at
+the full rate; with three open at the same time each is updated about every three seconds.
+
+Every time an airport is opened in Photoreal counts as one "root tile" of the Cesium ion
+[allowance](../README.md#a-cesium-ion-token), switching between airports included.
 
 ### Ground traffic
 

@@ -19,6 +19,7 @@
   --phase-landing_roll: #c084fc;
   --phase-pattern: #2dd4bf;
   --phase-transit: #e6edf3;
+  --phase-vehicle: #b8a98a;
   font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
   font-size: 14px;
 }
@@ -271,6 +272,9 @@ table.data td.muted {
 }
 .phase-transit {
   color: var(--phase-transit);
+}
+.phase-vehicle {
+  color: var(--phase-vehicle);
 }
 
 .debug > footer {
@@ -767,6 +771,9 @@ a.link {
 }
 .phase-edge-transit {
   border-left-color: var(--phase-transit);
+}
+.phase-edge-vehicle {
+  border-left-color: var(--phase-vehicle);
 }
 
 .metar-raw {

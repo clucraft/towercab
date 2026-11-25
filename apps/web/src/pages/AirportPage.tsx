@@ -11,7 +11,7 @@ import { parseSky, type SkySetting, savedSky, saveSky } from '../scene/sky';
 import { buildViewPresets, viewForShortcut } from '../scene/views';
 import { simFeed } from '../sim/simFeed';
 import { SelectionPanel } from '../ui/SelectionPanel';
-import { SidePanel } from '../ui/SidePanel';
+import { countAircraft, SidePanel } from '../ui/SidePanel';
 import { TopBar } from '../ui/TopBar';
 
 interface Notice {
@@ -453,7 +453,7 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
               {store.connection === 'open' ? (feed.label ?? 'live') : store.connection}
             </span>
             <span className="pill" data-testid="aircraft-count">
-              {store.aircraft.size} aircraft
+              {countAircraft(store.aircraft.values())} aircraft
             </span>
             {showFps && stats && (
               <span className="pill" data-testid="fps">

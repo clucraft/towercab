@@ -1,10 +1,50 @@
 import { expect, test } from '@playwright/test';
-import { aircraft, mockBackend } from './mocks';
+import { AIRPORT, aircraft, mockBackend } from './mocks';
 
 /**
  * Smoke test: loads /KLAF with every network dependency mocked (REST API and WebSocket feed) and checks
  * that aircraft appear in the 3D scene.
  */
+
+test('vehicles are listed on their own, and a link that does not apply is left out', async ({ page }) => {
+  // As adsb.fi sends one at KDEN, after the server has made sense of it.
+  const ops = (at: number) => ({
+    hex: 'a7f001',
+    addrType: 'adsr_icao',
+    callsign: 'OPS8',
+    category: 'C1',
+    lat: 40.4142,
+    lon: -86.9381,
+    posTime: at,
+    seenTime: at,
+    altSource: 'ground',
+    onGround: true,
+    aglFt: 0,
+    gsKt: 46,
+    trackDeg: 90,
+    headingDeg: 90,
+    phase: 'vehicle',
+    source: 'adsbfi',
+  });
+  await mockBackend(page, {
+    delta: (at, step) => ({ upserts: [...aircraft(at, step), ops(at)], removed: [] }),
+  });
+  const { diagram, ...links } = AIRPORT.links;
+  expect(diagram).toContain('faa.gov');
+  await page.route('**/api/airports/KLAF', (route) => route.fulfill({ json: { ...AIRPORT, links } }));
+  await page.goto('/KLAF');
+  await expect(page.getByTestId('airport-page')).toHaveAttribute('data-ready', 'true', { timeout: 60_000 });
+
+  await expect(page.getByTestId('group-vehicles')).toContainText('OPS8');
+  await expect(page.getByTestId('group-departing')).toHaveCount(0);
+  await expect(page.getByTestId('aircraft-count')).toHaveText('3 aircraft');
+  await page.getByTestId('group-vehicles').getByRole('button').click();
+  await expect(page.getByTestId('selection-panel')).toContainText('Vehicle');
+
+  const panel = page.getByTestId('side-panel');
+  await expect(panel.getByRole('link', { name: /LiveATC/ })).toBeVisible();
+  await expect(panel.getByRole('link', { name: /diagram/ })).toHaveCount(0);
+});
 
 test('aircraft from the feed appear in the 3D scene', async ({ page }) => {
   const errors: string[] = [];

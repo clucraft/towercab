@@ -45,8 +45,9 @@ type Picture = { of: 'aircraft'; photo: AircraftPhoto } | { of: 'type'; photo: T
 function usePicture(a: Aircraft, photos: boolean, typePhotos: boolean): Picture | null {
   const [picture, setPicture] = useState<Picture | null>(null);
   const { hex, typeCode } = a;
-  // Made-up aircraft and TIS-B tracks have no airframe to look up; they may still have a type.
-  const lookUp = photos && !hex.startsWith('~') && a.source !== 'simulator';
+  // Made-up aircraft and TIS-B tracks have no airframe to look up; they may still have a type. Nobody collects
+  // photos of airport vehicles.
+  const lookUp = photos && !hex.startsWith('~') && a.source !== 'simulator' && a.phase !== 'vehicle';
 
   useEffect(() => {
     setPicture(null);

@@ -485,6 +485,39 @@ describe('AirportTracker', () => {
     });
   });
 
+  describe('vehicles', () => {
+    // As adsb.fi sends them at KDEN: emitter category C1, some with the type "SERV", speeds of up to 46 kt.
+    const ops = (extra: object) => obs({ hex: 'a7f001', callsign: 'OPS8', category: 'C1', ...extra });
+
+    it('are vehicles whatever they do, and always on the ground', () => {
+      const t = tracker();
+      const phases: unknown[] = [];
+      [0, 46, 70, 12, 0].forEach((gsKt, i) => {
+        const at = T0 + i * 2000;
+        t.ingest([ops({ altBaro: 1400, gsKt, posTime: at, lat: 40.4165 + i * 1e-4, lon: -86.9365 })], 1, at);
+        const [a] = t.commit(at).upserts;
+        phases.push([a?.phase, a?.onGround, a?.aglFt, a?.heightM]);
+      });
+      expect(phases).toEqual(Array(5).fill(['vehicle', true, 0, undefined]));
+    });
+
+    it('become vehicles when a source says so later', () => {
+      const t = tracker();
+      const here = { lat: 40.4165, lon: -86.9365, altBaro: 'ground' as const, gsKt: 46 };
+      t.ingest([obs({ hex: 'a7f001', ...here, posTime: T0 })], 1, T0);
+      expect(t.commit(T0).upserts[0]?.phase).toBe('takeoff_roll');
+      t.ingest([ops({ ...here, typeCode: 'SERV', posTime: T0 + 2000 })], 1, T0 + 2000);
+      expect(t.commit(T0 + 2000).upserts[0]?.phase).toBe('vehicle');
+    });
+
+    it('do not include an aircraft whose transponder is set up wrong', () => {
+      const t = tracker();
+      t.ingest([ops({ typeCode: 'C172', altBaro: 1600, gsKt: 90, posTime: T0 })], 1, T0);
+      expect(t.commit(T0).upserts[0]).toMatchObject({ onGround: false });
+      expect(t.snapshot().aircraft[0]?.phase).not.toBe('vehicle');
+    });
+  });
+
   describe('altitude pipeline', () => {
     it('sends an ellipsoid height for airborne aircraft and none for aircraft on the ground', () => {
       const t = tracker({ qnhHpa: 1032.9 });
