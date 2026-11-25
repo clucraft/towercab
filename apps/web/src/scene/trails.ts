@@ -1,6 +1,14 @@
 import type { Aircraft, Phase, TrailPoint } from '@towercab/shared';
-import { Cartesian3, Color, Material, type Polyline, PolylineCollection, type Scene } from 'cesium';
-import type { AircraftLayer } from './aircraftLayer';
+import {
+  Cartesian3,
+  Color,
+  Ellipsoid,
+  Material,
+  type Polyline,
+  PolylineCollection,
+  type Scene,
+} from 'cesium';
+import type { AircraftLayer, DrawnAircraft } from './aircraftLayer';
 import type { GroundSampler } from './ground';
 import { PHASE_COLORS } from './palette';
 
@@ -8,6 +16,13 @@ import { PHASE_COLORS } from './palette';
 export const TRAIL_MS = 180_000;
 /** Ground points sit a little above the surface so the line is not buried in it. */
 const GROUND_CLEARANCE_M = 0.4;
+/**
+ * From far away the surface is drawn with less detail, up to a few metres above where it was read close by. The line
+ * is lifted with the distance to stay on top of that, by less than a pixel.
+ */
+const CLEARANCE_PER_M = 0.0005;
+/** Points on either side that a surface height is compared with. */
+const NEIGHBOURS = 2;
 const MIN_SPACING_MS = 900;
 
 interface Trail {
@@ -28,6 +43,7 @@ export class TrailLayer {
   private toSceneHeight: (ellipsoidM: number) => number = (h) => h;
   private fallbackGround = 0;
   private enabled = true;
+  private turn = 0;
 
   constructor(private readonly scene: Scene) {
     this.lines = scene.primitives.add(new PolylineCollection());
@@ -86,7 +102,13 @@ export class TrailLayer {
   update(renderTime: number, layer: AircraftLayer): void {
     if (!this.enabled) return;
     const oldest = renderTime - TRAIL_MS;
-    for (const [hex, trail] of this.trails) {
+    // Heights are looked up with what little the aircraft leave over. Starting with a different trail each time
+    // shares that out.
+    const all = [...this.trails];
+    const first = this.turn;
+    this.turn += 1;
+    for (let n = 0; n < all.length; n += 1) {
+      const [hex, trail] = all[(first + n) % all.length] as [string, Trail];
       const drawn = layer.get(hex);
       if (!drawn) {
         this.remove(hex);
@@ -98,14 +120,12 @@ export class TrailLayer {
       if (drop > 0) trail.points.splice(0, drop);
 
       const positions: Cartesian3[] = [];
-      for (const [t, lat, lon, heightM] of trail.points) {
-        if (t > renderTime) break;
-        const height =
-          heightM === null
-            ? (this.ground?.peek(lon, lat) ?? this.fallbackGround) + GROUND_CLEARANCE_M
-            : this.toSceneHeight(heightM);
-        positions.push(Cartesian3.fromDegrees(lon, lat, height));
-      }
+      const surface = this.surfaceAlong(trail.points, renderTime, drawn);
+      trail.points.forEach(([t, lat, lon, heightM], i) => {
+        if (t > renderTime) return;
+        if (heightM === null) positions.push(this.onSurface(lon, lat, surface[i] as number));
+        else positions.push(Cartesian3.fromDegrees(lon, lat, this.toSceneHeight(heightM)));
+      });
       if (drawn.visible) positions.push(Cartesian3.clone(drawn.position));
 
       if (positions.length < 2 || !drawn.visible) {
@@ -130,7 +150,40 @@ export class TrailLayer {
     this.trails.clear();
     this.scene.primitives.remove(this.lines);
   }
+
+  /**
+   * The surface under each point that is on the ground. The median of a few points in a row is used, so that one
+   * beside a building does not go up on the roof. Where nothing is known (no tiles there, or not looked up yet) it is
+   * taken to be that of the nearest point before, or else after: airfields are flat, and the official elevation can
+   * be many metres off.
+   */
+  private surfaceAlong(points: readonly TrailPoint[], renderTime: number, drawn: DrawnAircraft): number[] {
+    const found = points.map(([t, lat, lon, heightM]) =>
+      heightM !== null || t > renderTime ? undefined : this.ground?.backgroundHeightAt(lon, lat),
+    );
+    let nearest =
+      found.find((height) => height !== undefined) ?? (drawn.onGround ? drawn.height : this.fallbackGround);
+    return found.map((height, i) => {
+      if (height === undefined) return nearest;
+      const row = found.slice(Math.max(0, i - NEIGHBOURS), i + NEIGHBOURS + 1).filter((h) => h !== undefined);
+      row.sort((a, b) => a - b);
+      nearest = row[Math.floor((row.length - 1) / 2)] ?? height;
+      return nearest;
+    });
+  }
+
+  /** A point of a line that lies on the ground, as it is seen from where the camera is. */
+  private onSurface(lon: number, lat: number, height: number): Cartesian3 {
+    const point = Cartesian3.fromDegrees(lon, lat, height);
+    const distance = Cartesian3.distance(point, this.scene.camera.positionWC);
+    const up = Ellipsoid.WGS84.geodeticSurfaceNormal(point, scratchUp);
+    if (!up) return point;
+    Cartesian3.multiplyByScalar(up, GROUND_CLEARANCE_M + distance * CLEARANCE_PER_M, up);
+    return Cartesian3.add(point, up, point);
+  }
 }
+
+const scratchUp = new Cartesian3();
 
 /**
  * A material for one line. Never share one between lines: removing a line from a PolylineCollection destroys

@@ -148,6 +148,8 @@ towercab/
       any reason is built again (D-069)
 - [x] Photoreal on phones (D-070 to D-073)
 - [x] A picture of the aircraft type when there is no photo of the aircraft (D-074, D-075)
+- [x] Aircraft on the ground jumped 100 m up and back in Photoreal, and left spikes in their trails (D-076); a check
+      that compares heights with what is drawn (D-077)
 
 ### Not verified, for want of hardware, accounts or keys
 

@@ -11,6 +11,11 @@ export interface GroundSampler {
   heightAt(lon: number, lat: number): number | undefined;
   /** The surface height if it is already known. Never starts a lookup. */
   peek(lon: number, lat: number): number | undefined;
+  /**
+   * Like `peek`, but a place that is not known well yet may be looked up with what the aircraft leave over. For
+   * things that can wait, such as the points of a trail.
+   */
+  backgroundHeightAt(lon: number, lat: number): number | undefined;
   dispose(): void;
 }
 
@@ -20,6 +25,9 @@ export class FlatGround implements GroundSampler {
     return 0;
   }
   peek(): number {
+    return 0;
+  }
+  backgroundHeightAt(): number {
     return 0;
   }
   dispose(): void {}
@@ -91,6 +99,11 @@ export class SampledGround implements GroundSampler {
 
   peek(lon: number, lat: number): number | undefined {
     return this.resolve(lon, lat, false);
+  }
+
+  /** Lookups go out newest first, so anything asked for here would be served before the aircraft. */
+  backgroundHeightAt(lon: number, lat: number): number | undefined {
+    return this.peek(lon, lat);
   }
 
   dispose(): void {
@@ -179,9 +192,17 @@ const DIAGONALS: [number, number][] = [
   [1, 1],
 ];
 
+/** What a probe found. */
+export interface SurfaceReading {
+  /** Scene height, metres. */
+  height: number;
+  /** How rough the surface that was read is, metres: the geometric error of the tile. */
+  errorM: number;
+}
+
 export interface ProbedGroundOptions {
-  /** Reads the surface height at a point from what is loaded right now. Undefined where nothing is loaded. */
-  probe: (lon: number, lat: number) => number | undefined;
+  /** Reads the surface at a point from what is loaded right now. Undefined where nothing usable is loaded. */
+  probe: (lon: number, lat: number) => SurfaceReading | undefined;
   /** Grid size in degrees of latitude. The default is about 10 m. */
   cellDeg?: number;
   /** Median over the cell and its four diagonal neighbours; see `SampledGroundOptions.smooth`. */
@@ -193,6 +214,8 @@ export interface ProbedGroundOptions {
   ttlMs?: number;
   /** A point with nothing loaded under it is not asked again for this long. */
   retryMs?: number;
+  /** Whether everything for the current view has arrived, so that rough readings are as good as they will get. */
+  settled?: () => boolean;
   /** Probes allowed between two calls of `beginFrame`: a cap on what a single frame may cost. */
   probesPerFrame?: number;
   /**
@@ -209,13 +232,33 @@ export interface ProbedGroundOptions {
 const NEW_CELLS_SHARE = 0.5;
 /** Probe time that may be saved up, so that a few aircraft appearing at once are placed without delay. */
 const MAX_CREDIT_MS = 12;
+/**
+ * A surface this fine or finer is taken as it is drawn. One that is rougher never replaces a finer reading: rough
+ * tiles come and go while the view moves, and the ground does not.
+ */
+const FINE_ENOUGH_M = 20;
+/** How long a reading from a rougher surface is trusted while finer ones are on their way. */
+const ROUGH_TTL_MS = 1000;
+/** A place that could not be read well in the background is tried again this long after it was next due. */
+const BACKGROUND_RETRY_MS = 4000;
+
+/** Who is asking: something that may not cause a lookup, an aircraft, or something that can wait. */
+type Asking = 'peek' | 'aircraft' | 'background';
+
+interface Cell {
+  height: number | undefined;
+  errorM: number;
+  readAt: number;
+  /** When to read it again. */
+  until: number;
+}
 
 /**
  * A surface that can be read synchronously from what is currently loaded (3D tiles). Reading is cheap but
  * not free, so answers are kept on a grid for a few seconds and the number of reads per frame is capped.
  */
 export class ProbedGround implements GroundSampler {
-  private readonly cache = new Map<string, { height: number | undefined; until: number }>();
+  private readonly cache = new Map<string, Cell>();
   private readonly cellDeg: number;
   private readonly smooth: boolean;
   private readonly ttlMs: number;
@@ -262,28 +305,33 @@ export class ProbedGround implements GroundSampler {
   }
 
   heightAt(lon: number, lat: number): number | undefined {
-    return this.resolve(lon, lat, true);
+    return this.resolve(lon, lat, 'aircraft');
   }
 
   peek(lon: number, lat: number): number | undefined {
-    return this.resolve(lon, lat, false);
+    return this.resolve(lon, lat, 'peek');
+  }
+
+  backgroundHeightAt(lon: number, lat: number): number | undefined {
+    return this.resolve(lon, lat, 'background');
   }
 
   dispose(): void {
     this.cache.clear();
   }
 
-  private resolve(lon: number, lat: number, refresh: boolean): number | undefined {
+  private resolve(lon: number, lat: number, asking: Asking): number | undefined {
     const row = Math.round(lat / this.cellDeg);
     const lonCell = this.cellDeg / Math.max(0.2, Math.cos((lat * Math.PI) / 180));
     const column = Math.round(lon / lonCell);
-    const centre = this.cell(row, column, lonCell, refresh);
+    const centre = this.cell(row, column, lonCell, asking);
     if (!this.smooth || centre === undefined) return centre;
 
     // The cell and its four diagonal neighbours: five reads cover a 30 m square.
     const values: number[] = [centre];
+    const around = asking === 'aircraft' ? asking : 'peek';
     for (const [dr, dc] of DIAGONALS) {
-      const value = this.cell(row + dr, column + dc, lonCell, refresh);
+      const value = this.cell(row + dr, column + dc, lonCell, around);
       if (value !== undefined) values.push(value);
     }
     if (values.length < 4) return centre;
@@ -291,12 +339,17 @@ export class ProbedGround implements GroundSampler {
     return values[Math.floor(values.length / 2)];
   }
 
-  private cell(row: number, column: number, lonCell: number, refresh: boolean): number | undefined {
+  private cell(row: number, column: number, lonCell: number, asking: Asking): number | undefined {
     const key = `${row}:${column}`;
     const entry = this.cache.get(key);
-    if (!refresh) return entry?.height;
+    if (asking === 'peek') return entry?.height;
     const now = this.now();
-    if (entry && now < entry.until) return entry.height;
+    if (asking === 'background') {
+      const good = entry?.height !== undefined && entry.errorM <= FINE_ENOUGH_M;
+      if (entry && (good || now < entry.until + BACKGROUND_RETRY_MS)) return entry.height;
+      // Some credit is left for aircraft that turn up in the next frames.
+      if (this.credit < MAX_CREDIT_MS / 2) return entry?.height;
+    } else if (entry && now < this.due(entry)) return entry.height;
     // Out of allowance for this frame: keep using the old answer, and ask again next frame.
     if (this.budget <= 0 || this.credit <= 0) return entry?.height;
     // Part of the allowance is kept for places never read before: an aircraft rolling out needs those now,
@@ -304,14 +357,33 @@ export class ProbedGround implements GroundSampler {
     if (entry && this.budget <= this.probesPerFrame * NEW_CELLS_SHARE) return entry.height;
     this.budget -= 1;
     this.probes += 1;
-    const height = this.options.probe(column * lonCell, row * this.cellDeg);
+    const reading = this.options.probe(column * lonCell, row * this.cellDeg);
     this.credit -= this.now() - now;
-    const valid = typeof height === 'number' && Number.isFinite(height);
     if (!entry && this.cache.size >= this.maxCells) this.cache.clear();
+
+    const cell: Cell = entry ?? { height: undefined, errorM: Number.POSITIVE_INFINITY, readAt: 0, until: 0 };
+    // While nothing usable is loaded at a point, or only something rougher than what it was last read from, the
+    // last known height is the better one.
+    if (
+      reading &&
+      Number.isFinite(reading.height) &&
+      (cell.height === undefined || reading.errorM <= Math.max(cell.errorM, FINE_ENOUGH_M))
+    ) {
+      cell.height = reading.height;
+      cell.errorM = reading.errorM;
+    }
+    cell.readAt = now;
     // Spread the expiry a little, so a row of parked aircraft is not re-read in the same frame.
-    const life = valid ? this.ttlMs * (0.75 + ((row * 31 + column * 17) & 15) / 32) : this.retryMs;
-    // While nothing is loaded at a point, the last known height is better than none.
-    this.cache.set(key, { height: valid ? height : entry?.height, until: now + life });
-    return valid ? height : entry?.height;
+    const life = this.ttlMs * (0.75 + ((row * 31 + column * 17) & 15) / 32);
+    cell.until = now + (cell.height === undefined ? this.retryMs : life);
+    this.cache.set(key, cell);
+    return cell.height;
+  }
+
+  /** When an aircraft is due a new reading of a cell. */
+  private due(cell: Cell): number {
+    const rough = cell.height !== undefined && cell.errorM > FINE_ENOUGH_M;
+    const loading = rough && this.options.settled?.() === false;
+    return loading ? Math.min(cell.until, cell.readAt + ROUGH_TTL_MS) : cell.until;
   }
 }

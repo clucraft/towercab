@@ -37,6 +37,7 @@ import { LabelOverlay } from './labelOverlay';
 import { LayoutLayer } from './layoutLayer';
 import { SCHEMATIC } from './palette';
 import { DetailGovernor, PROFILES, type Quality, type QualityProfile } from './quality';
+import { tileProbe } from './tileSurface';
 import { TrailLayer } from './trails';
 import { buildViewPresets, resolveView, type ViewPreset } from './views';
 
@@ -1083,18 +1084,17 @@ export class SceneController {
 
     if (this.currentMode === 'photoreal' && this.tileset) {
       const tileset = this.tileset;
-      const scratch = new Cartographic();
+      const read = tileProbe(tileset, scene, fieldEllipsoid);
       this.heightOffset = 0;
       // Read from the tiles that are loaded, which is what is on screen. This is cheap enough for every
       // aircraft on the ground, and an aircraft stands on the surface exactly as it is drawn. (Asking
       // Cesium for the most detailed tiles instead takes seconds per batch.)
       this.ground = new ProbedGround({
         probe: (lon, lat) => {
-          const height = tileset.getHeight(Cartographic.fromDegrees(lon, lat, 0, scratch), scene);
-          return height !== undefined && Math.abs(height - fieldEllipsoid) <= SURFACE_SANITY_M
-            ? height
-            : undefined;
+          const found = read(lon, lat);
+          return found && Math.abs(found.height - fieldEllipsoid) <= SURFACE_SANITY_M ? found : undefined;
         },
+        settled: () => tileset.tilesLoaded,
         // Photogrammetry has lumps where aircraft stood when it was captured.
         smooth: true,
         probesPerFrame: this.profile.probes.perFrame,

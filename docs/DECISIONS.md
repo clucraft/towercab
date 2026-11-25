@@ -250,7 +250,8 @@ The prompt suggests `sampleHeightMostDetailed` or `clampToHeight`. Measured with
 KIND, `sampleHeightMostDetailed` managed about 13 points a second and held the frame rate at 9 fps while it
 worked; ground aircraft were still waiting for their height after 40 s. Photoreal therefore uses
 `Cesium3DTileset.getHeight` (with `enableCollision`), which reads the tiles that are loaded: synchronous,
-about a millisecond a point, and it puts an aircraft on the surface exactly as it is drawn. Details:
+about a millisecond a point, and it puts an aircraft on the surface exactly as it is drawn. (It does not: since
+D-076 the tiles are read directly, and the grid keeps the best reading.) Details:
 
 - heights are kept on a 10 m grid for 20 s, then read again, so aircraft follow the tiles as they refine;
 - at most three reads per frame, shared round-robin between aircraft;
@@ -652,7 +653,7 @@ although all eight of its children were there. Cesium's default traversal refine
 descendant with content has loaded, and counts an empty tile that is out of view and fine enough already as not
 loaded. (Its source says so, and makes an exception for vector tilesets only.) The other traversal has no such rule. It
 shows the airfield sharply from the tower and loads half as many tiles (157 instead of 330). No artefacts were
-seen in the tower, overhead, orbit and runway 10 views.
+seen in the tower, overhead, orbit and runway 10 views. There was one, in the heights of aircraft: D-076.
 
 ### D-074 A picture of the type when there is none of the aircraft
 
@@ -676,3 +677,40 @@ a User-Agent that says who is asking, a standard thumbnail width (500), hotlinki
 licence asks for. While testing with an anonymous client the API answered 429 after some twenty requests in a few minutes; the
 server treats that as "ask again in ten minutes", not as "there is no picture". planespotters.net's API page refuses
 to be read by a program (403), so its other endpoints were left alone.
+
+### D-076 Aircraft on the ground jumped 100 m up and back (Fix)
+
+Reported with a picture on 2026-11-25: spikes in the trails of two aircraft taxiing at KLAF, and the aircraft going
+up and down. The data was fine; the server had both on the ground, without a height, throughout. The browser looks
+the height up in Google's tiles, and that went wrong in three steps:
+
+- Several tiles can cover a point at once: while finer ones arrive, and with `skipLevelOfDetail` (D-073) also
+  afterwards. Cesium draws the finest, but `Cesium3DTileset.getHeight` answers with the first it meets in the order
+  of their bounding spheres, which is the roughest. A tile of 2055 m has its surface 103 m above KLAF's taxiways.
+- The limit of 120 m against field elevation lets 103 m through.
+- Trails used what had been read when the aircraft passed and never read it again, so the aircraft came down and the
+  spike stayed.
+
+It was there in 0.1.0, and D-073 made it about three times as frequent: with the same camera moves 9.4 percent of readings
+were more than 40 m off instead of 3.4. In the tower view at KLAF, freshly opened, it also put aircraft 3.4 m (median)
+above the taxiway.
+
+Now the finest tile at the point is read; tiles rougher than 150 m are not read at all; a rough reading never
+replaces a fine one, and is read again every second while anything is loading. The points of a trail are looked up
+with what the aircraft leave over, take the median of five in a row (the roof of a hangar beside the taxiway), and
+where nothing is known that of the nearest point instead of the official elevation. Measured while zooming and
+changing views: aircraft parked at KLAF moved up and down by as much as 118 m, all 16 of them by more than 40, and now
+by 1.2 m at most; at KIND 8.8 m, now 2.7. No slower on the stand-in for a phone (31 frames a second, 1.2 instead of 1.7 ms
+a frame spent reading).
+
+This uses two things of Cesium that are not public, the list of tiles in use and looking for a point in one. The version is
+pinned, and a test fails if an upgrade takes them away.
+
+### D-077 `pnpm verify:surface` compares heights with the depth buffer
+
+`verify:scene` compared aircraft with the scene's own lookup and passed all along while the lookup was wrong. The
+new check compares the lookup with what is on screen: along the runways, in three views, it asks the depth buffer what
+is drawn at a pixel and the lookup how high that point is; then it moves the camera about and watches for readings that
+stray. It agrees to a centimetre at KLAF and KIND. Two traps on the way there: `pickPosition` remembers its answers by the
+text of the position it is given, which is the same for every plain object; and with antialiasing the depth of a
+pixel can be that of something at its edge.
