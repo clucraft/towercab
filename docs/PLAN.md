@@ -156,7 +156,7 @@ towercab/
       is left out where it does not apply (D-082), Google's limit per minute is waited out (D-083), open airports take
       turns at adsb.fi (D-084), taxiing aircraft are held, not faded (D-085)
 - [x] A radio in the side panel for stations you configure, such as your own airband receiver; LiveATC linked, not
-      played (D-086, `RADIO.md`)
+      played (D-086, `RADIO.md`); LiveATC's feeds, with their permission, fed to the player as they arrive (D-087)
 
 ### Not verified, for want of hardware, accounts or keys
 

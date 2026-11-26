@@ -59,8 +59,17 @@ for "station 0 of KLAF", never for an address. Each listener holds one connectio
 the radio plays, and the server allows 24 at a time. Only audio is passed on: a page or anything else from that
 address is refused.
 
-The signal meter shows the sound's level for stations that come through the server. For one played straight from
-another site the browser does not let the page look at the sound, and the meter shows a steady line instead.
+### How it plays
+
+Where the browser can (Media Source Extensions with MP3 or AAC: Chrome, Edge and Firefox, among others), the page
+fetches the stream itself and feeds it to the player as it arrives. Playing starts as soon as a second of sound is in
+hand, and keeps within a few seconds of the live edge. A browser's own audio player would wait for a good deal more:
+about 30 s of the 8 kbps streams some airband feeds use. Fed this way, the sound can also be measured, and the signal
+meter shows its level.
+
+That needs the stream's server to allow being fetched from another site (CORS); one through this server always is.
+Where the browser cannot feed a stream, or its server does not allow it, the browser's own player plays the address,
+which works but can be slow to start, and the meter shows a steady line instead of the level.
 
 ## A receiver of your own
 
@@ -112,7 +121,31 @@ allow that without them:
 
 If LiveATC gives you permission, add their stream as a station **without** `proxy`. TowerCab then adds the credit
 "Audio from LiveATC.net" with a link to their site by itself, and refuses `proxy: true` for any address on
-liveatc.net. Ask through their [contact form](https://www.liveatc.net/ct/contact.php).
+liveatc.net. Ask through their [contact form](https://www.liveatc.net/ct/contact.php). A permission is for the site
+that asked: the deployment this was written for has one (by email, 2026-11-25); another TowerCab needs its own.
 
-Their FAQ says the audio usually arrives less than 20 seconds after it was spoken. The 3D scene is about 2.5 seconds
-behind, so with LiveATC the voices come after the aircraft they are about. A receiver of your own is close to live.
+### Finding a feed's address
+
+LiveATC's page for an airport (`https://www.liveatc.net/search/?icao=KORD`) lists its feeds, each with its status
+and frequencies. On 2026-11-25 every feed's HTML5 player streamed from `https://s1-bos.liveatc.net/<feed>`, where
+`<feed>` is the name in the feed's Windows Media Player link, `/play/asx/<feed>.asx`. For example:
+
+```yaml
+audio:
+  - {
+      name: "O'Hare Tower 10L/28R",
+      frequency: "132.700",
+      url: "https://s1-bos.liveatc.net/kord1n1_twr_132700",
+    }
+```
+
+Their stream servers answer only an address they have not seen before: asked for the same one again, they hold the
+request and then drop it. Their own player adds a fresh `nocache` value to the address each time, and TowerCab does
+the same for any station on liveatc.net. They allow being fetched from other sites, so the meter works. A feed that
+is down on their page will not play here either. If a station goes silent for good, look up its feed again: LiveATC
+may have moved it to another server or name.
+
+Some feeds take several seconds to answer at all, about 8 s for KLAF on the evening of 2026-11-25, and their
+own player waits as long. Their FAQ says the audio usually arrives less than 20 seconds after it was spoken. The 3D
+scene is about 2.5 seconds behind, so with LiveATC the voices come after the aircraft they are about. A receiver of
+your own is close to live.

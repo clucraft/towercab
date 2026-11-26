@@ -3,7 +3,7 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { type AirportDetail, isLiveAtcUrl, publicAudioStations } from '@towercab/shared';
+import { type AirportDetail, isLiveAtcUrl, publicAudioStations, streamUrlNow } from '@towercab/shared';
 import type { FastifyInstance } from 'fastify';
 import pino from 'pino';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -104,6 +104,20 @@ describe('radio', () => {
       ]);
       expect(station?.attribution).toBe('Audio from LiveATC.net');
       expect(station?.link).toBe('https://www.liveatc.net');
+    });
+
+    it('asks LiveATC for a new address every time, as their own player does, and leaves others alone', () => {
+      const liveatc = { src: 'https://s1-bos.liveatc.net/klaf', proxied: false };
+      expect(streamUrlNow(liveatc, 1795658000000)).toBe(
+        'https://s1-bos.liveatc.net/klaf?nocache=1795658000000',
+      );
+      expect(streamUrlNow({ ...liveatc, src: `${liveatc.src}?a=1` }, 5)).toBe(
+        'https://s1-bos.liveatc.net/klaf?a=1&nocache=5',
+      );
+      expect(streamUrlNow({ src: 'https://radio.example.test/klaf', proxied: false }, 5)).toBe(
+        'https://radio.example.test/klaf',
+      );
+      expect(streamUrlNow({ src: '/proxy/audio/KLAF/0', proxied: true }, 5)).toBe('/proxy/audio/KLAF/0');
     });
 
     it('knows LiveATC by its host name only', () => {

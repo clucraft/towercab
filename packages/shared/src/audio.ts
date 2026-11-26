@@ -51,6 +51,17 @@ export function isLiveAtcUrl(url: string | { href: string }): boolean {
   return bare === 'liveatc.net' || bare.endsWith('.liveatc.net');
 }
 
+/**
+ * The address to load for a station right now. LiveATC's stream servers answer only a request whose address is
+ * new: the same address again hangs and is then reset (tried on 2026-11-25), and their own player adds a fresh
+ * `nocache` value every time. So does this, for their streams only.
+ */
+export function streamUrlNow(station: Pick<PublicAudioStation, 'src' | 'proxied'>, now = Date.now()): string {
+  if (station.proxied || !isLiveAtcUrl(station.src)) return station.src;
+  const separator = station.src.includes('?') ? '&' : '?';
+  return `${station.src}${separator}nocache=${now}`;
+}
+
 /** The path under which this server passes on a proxied station. */
 export function audioProxyPath(icao: string, index: number): string {
   return `/proxy/audio/${encodeURIComponent(icao)}/${index}`;

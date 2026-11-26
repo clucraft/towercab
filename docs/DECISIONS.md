@@ -844,3 +844,22 @@ live edge. The signal meter measures the sound only for proxied stations: Web Au
 without CORS headers would make it silent, so such a station plays straight through the audio element and the meter
 shows a steady line. The radio lives with the page, not the side panel, so closing the panel does not stop it; a pill
 over the scene shows it is on and stops it, and so does `R`.
+
+### D-087 LiveATC feeds, fed to the player as they arrive (Fix)
+
+LiveATC gave this deployment's owner permission by email on 2026-11-25 to play their feeds; no addresses came with it.
+Their airport pages give each feed's status, frequencies and name, and their HTML5 player streamed every feed looked at
+from `https://s1-bos.liveatc.net/<feed>`, with a fresh `nocache` value on the address each time. Tried from another
+site: without a new value the request hangs and is reset after about 20 s; with one it answers 200 `audio/mpeg`, and
+CORS is allowed. So the radio adds a fresh `nocache` to any liveatc.net address.
+
+The audio element then took 30 s or more to start KLAF's feed, which is MPEG-2.5 Layer III at 8 kbps, 8 kHz mono:
+it waits for a good deal of a stream before it plays. KDTW's, at 32 kbps, started after 9 s. LiveATC's own player
+feeds the stream through Media Source Extensions, and so does the radio now: where the browser has them for MP3 (or
+AAC), the page fetches the stream, appends it as it comes, starts after one second in hand, catches up when more than
+eight seconds behind, and lets go of what was played. KORD and KDTW then went on air within a second, KLAF after 9 s,
+all of which was LiveATC's server answering. Fed sound is on the page's origin, so the meter measures LiveATC too.
+Where there are no Media Source Extensions (older iPhones) or a stream's server refuses other sites, the element plays
+the address itself as before. A stream that ends is played out before the radio says it stopped.
+
+All 17 tower feeds configured for the eight airports answered with audio on 2026-11-25.

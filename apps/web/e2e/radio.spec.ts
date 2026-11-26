@@ -23,6 +23,16 @@ function toneWav(seconds: number): Buffer {
   return wav;
 }
 
+/**
+ * Silent MP3, as a low-bitrate airband stream would send between transmissions: MPEG-1 Layer III frames of
+ * 32 kbps, 44.1 kHz, mono, with no sound in them (104 bytes each, 26 ms).
+ */
+function silentMp3(seconds: number): Buffer {
+  const frame = Buffer.alloc(104);
+  frame.set([0xff, 0xfb, 0x10, 0xc0]);
+  return Buffer.concat(Array.from({ length: Math.ceil((seconds * 44100) / 1152) }, () => frame));
+}
+
 const STATIONS = [
   {
     name: 'Purdue Tower',
@@ -74,6 +84,64 @@ test('the radio plays a station, shows it on air, changes station and stops', as
   await expect(page.getByTestId('radio-pill')).toContainText('Purdue Ground', { timeout: 15_000 });
   await page.keyboard.press('r');
   await expect(page.getByTestId('radio-pill')).toHaveCount(0);
+});
+
+test('an MP3 stream from another site that allows it is fed in as it comes, and measured', async ({
+  page,
+}) => {
+  await mockBackend(page, {
+    airport: {
+      audio: [
+        {
+          name: 'Elsewhere Tower',
+          frequency: '120.000',
+          src: 'https://radio.example.test/twr',
+          proxied: false,
+        },
+      ],
+    },
+  });
+  const silence = silentMp3(60);
+  await page.route('https://radio.example.test/**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'audio/mpeg',
+      headers: { 'access-control-allow-origin': '*' },
+      body: silence,
+    }),
+  );
+  await page.goto('/KLAF');
+  const radio = page.getByTestId('radio');
+  await radio.getByRole('button', { name: 'Play Elsewhere Tower' }).click();
+  await expect(radio).toContainText('On air', { timeout: 10_000 });
+  // Fed in by the page, the sound is on the page's origin, so the meter has bars rather than a steady line.
+  await expect(radio.locator('.radio-bar')).toHaveCount(12);
+  await expect(radio.locator('.radio-meter.steady')).toHaveCount(0);
+});
+
+test('a stream from another site that does not allow it is played the plain way', async ({ page }) => {
+  await mockBackend(page, {
+    airport: {
+      audio: [
+        {
+          name: 'Closed Tower',
+          frequency: '120.000',
+          src: 'https://closed.example.test/twr',
+          proxied: false,
+        },
+      ],
+    },
+  });
+  const tone = toneWav(30);
+  await page.route('https://closed.example.test/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'audio/wav', body: tone }),
+  );
+  await page.goto('/KLAF');
+  const radio = page.getByTestId('radio');
+  await radio.getByRole('button', { name: 'Play Closed Tower' }).click();
+  await expect(radio).toContainText('On air', { timeout: 15_000 });
+  // It plays, but the page may not look at the sound: a steady line instead of bars.
+  await expect(radio.locator('.radio-meter.steady')).toHaveCount(1);
 });
 
 test('a station that does not answer says so', async ({ page }) => {
