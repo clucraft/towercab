@@ -3,6 +3,7 @@ export * from './aircraftTypes';
 export * from './airport';
 export * from './airportInfo';
 export * from './altitude';
+export * from './audio';
 export * from './camera';
 export * from './geo';
 export * from './messages';

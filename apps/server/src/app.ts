@@ -5,6 +5,7 @@ import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance, LogController } from 'fastify';
 import { registerAdminRoutes } from './routes/admin';
 import { registerApiRoutes } from './routes/api';
+import { registerAudioRoutes } from './routes/audio';
 import { registerCameraRoutes } from './routes/cameras';
 import type { Services } from './services';
 import { findUp } from './util/paths';
@@ -50,6 +51,7 @@ export async function buildApp(services: Services): Promise<FastifyInstance> {
 
   registerApiRoutes(app, services);
   registerCameraRoutes(app, services);
+  registerAudioRoutes(app, services);
   registerAdminRoutes(app, services);
   services.hub.attach(app.server);
   app.addHook('onClose', async () => services.close());

@@ -155,6 +155,8 @@ towercab/
 - [x] Tried at KORD, KMDW, KFWA, KDEN, KDTW, KLAN, KDAY and WSSS (`ADDING_AN_AIRPORT.md`); vehicles are not aircraft (D-081), the FAA link
       is left out where it does not apply (D-082), Google's limit per minute is waited out (D-083), open airports take
       turns at adsb.fi (D-084), taxiing aircraft are held, not faded (D-085)
+- [x] A radio in the side panel for stations you configure, such as your own airband receiver; LiveATC linked, not
+      played (D-086, `RADIO.md`)
 
 ### Not verified, for want of hardware, accounts or keys
 
@@ -163,6 +165,7 @@ Each is recorded in DECISIONS.md with what was checked instead.
 - [ ] The Unraid template through the web UI's Add Container form (the rest was checked on Unraid 7.2.0,
       D-067), and Zoraxy (D-061)
 - [ ] A local receiver with real hardware; the `receiver` compose profile (D-065)
+- [ ] The radio with a real airband receiver and Icecast; it was tried with a stand-in stream (D-086)
 - [ ] YouTube and Windy discovery against real search results (D-052)
 - [ ] airplanes.live and OpenSky with credentials (D-011, D-016)
 - [ ] Frame rate on integrated graphics (D-038), and on real phones (D-072)

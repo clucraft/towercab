@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AudioStationSchema, MAX_AUDIO_STATIONS } from './audio';
 import { isTimeZone } from './sun';
 
 /** ICAO location indicator, e.g. `KLAF`. Accepts lower case and normalises to upper case. */
@@ -54,6 +55,8 @@ export const AirportEntrySchema = z.object({
   /** `tower`, `overhead`, `orbit` or a runway end such as `rwy-10`. */
   defaultView: z.string().min(1).default('overhead'),
   links: AirportLinksSchema.optional(),
+  /** Radio stations for the radio in the side panel. None by default; see docs/RADIO.md. */
+  audio: z.array(AudioStationSchema).max(MAX_AUDIO_STATIONS).default([]),
 });
 export type AirportEntry = z.infer<typeof AirportEntrySchema>;
 export type AirportEntryInput = z.input<typeof AirportEntrySchema>;

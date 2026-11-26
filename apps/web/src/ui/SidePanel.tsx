@@ -10,8 +10,10 @@ import {
   type ProviderHealth,
   rankRunwaysByWind,
 } from '@towercab/shared';
+import type { RadioControl } from '../radio/useRadio';
 import type { SkySetting } from '../scene/sky';
 import { Daylight } from './Daylight';
+import { Radio } from './Radio';
 
 interface Props {
   airport: AirportDetail;
@@ -28,6 +30,7 @@ interface Props {
   selected: string | null;
   onSelect(hex: string): void;
   onClose(): void;
+  radio: RadioControl;
 }
 
 /** The list groups, in the order a controller would care about them. Vehicles come after, on their own. */
@@ -182,6 +185,7 @@ export function SidePanel({
   selected,
   onSelect,
   onClose,
+  radio,
 }: Props) {
   const sources = status?.providers.filter((p) => p.enabled) ?? [];
   const byLabel = (a: Aircraft, b: Aircraft) => aircraftLabel(a).localeCompare(aircraftLabel(b));
@@ -198,6 +202,11 @@ export function SidePanel({
           ›
         </button>
       </header>
+
+      <details open>
+        <summary>Radio</summary>
+        <Radio radio={radio} icao={airport.icao} liveatc={airport.links.liveatc} />
+      </details>
 
       <details open>
         <summary>

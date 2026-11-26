@@ -1,4 +1,10 @@
-import { AirportEntrySchema, CameraConfigSchema, parseYouTubeSource } from '@towercab/shared';
+import {
+  AirportEntrySchema,
+  type AudioStation,
+  CameraConfigSchema,
+  isLiveAtcUrl,
+  parseYouTubeSource,
+} from '@towercab/shared';
 import { z } from 'zod';
 import { type HostRule, matchRule, parseHostRule } from '../cameras/allowlist';
 
@@ -167,6 +173,13 @@ export const ConfigFileSchema = z
         ctx.addIssue({ code: 'custom', path: ['proxy', 'allowlist', i], message: (err as Error).message });
       }
     });
+    cfg.airports.forEach((a, i) => {
+      a.audio.forEach((station, j) => {
+        const problem = audioStationProblem(a.icao, station, rules);
+        if (problem)
+          ctx.addIssue({ code: 'custom', path: ['airports', i, 'audio', j, 'url'], message: problem });
+      });
+    });
     const ids = new Set<string>();
     cfg.cameras.forEach((c, i) => {
       const problem = cameraSourceProblem(c, rules);
@@ -225,6 +238,27 @@ export function cameraSourceProblem(
   } else if (url.username || url.password) {
     // Without the proxy the address goes to every viewer's browser as it is.
     return `camera ${camera.id}: the source contains a user name or password; set "proxy: true" so it stays on the server`;
+  }
+  return null;
+}
+
+/** What is wrong with a radio station's address, in words for the person editing the config. */
+export function audioStationProblem(
+  icao: string,
+  station: Pick<AudioStation, 'name' | 'url' | 'proxy'>,
+  rules: readonly HostRule[],
+): string | null {
+  const url = new URL(station.url);
+  const which = `${icao} radio station "${station.name}"`;
+  if (station.proxy) {
+    // LiveATC's terms of use (3.3) forbid making their service available over another network.
+    if (isLiveAtcUrl(url)) {
+      return `${which}: LiveATC's terms of use do not allow its streams to be passed on through another server. See docs/RADIO.md`;
+    }
+    if (!matchRule(url, rules)) return `${which} is proxied, but ${url.host} is not on proxy.allowlist`;
+  } else if (url.username || url.password) {
+    // Without the proxy the address goes to every listener's browser as it is.
+    return `${which}: the address contains a user name or password; set "proxy: true" so it stays on the server`;
   }
   return null;
 }

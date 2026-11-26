@@ -47,6 +47,13 @@ airports:
     # airport diagram unless you link one here.
     links:
       liveatc: "https://www.liveatc.net/search/?icao=KLAF"
+
+    # Stations for the radio in the side panel, such as a receiver of your own. See RADIO.md.
+    audio:
+      - name: Purdue Tower
+        frequency: "118.300"
+        url: "http://192.168.1.20:8000/klaf-twr.mp3"
+        proxy: true
 ```
 
 ### Radius and ceiling

@@ -15,6 +15,14 @@ airports:
     # the structure, so it is marked approximate. Set `tower: null` to use OpenStreetMap, when it has one.
     tower: { lat: 40.414761, lon: -86.933297, heightM: 23, approximate: true }
     defaultView: tower # tower | overhead | orbit | rwy-<designator>, e.g. rwy-10
+    # Stations for the radio in the side panel. None ship: there is no stream TowerCab may play for you.
+    # A receiver of your own is the usual source; docs/RADIO.md explains every field and LiveATC's terms.
+    # audio:
+    #   - name: Purdue Tower
+    #     frequency: "118.300"            # shown on the radio, nothing more
+    #     url: "http://192.168.1.20:8000/klaf-twr.mp3"
+    #     proxy: true                     # through this server: its host must be on proxy.allowlist below
+    #     attribution: My receiver at the field
   - icao: KIND
     radiusNm: 8
     ceilingFtAgl: 6000
@@ -66,9 +74,9 @@ polling:
 #     pose: { lat: 40.4148, lon: -86.9333, heightM: 12, headingDeg: 230, pitchDeg: -4, hfovDeg: 55 }
 cameras: []
 
-# The server fetches camera media on a browser's behalf only for cameras marked `proxy: true`, and
-# only from the hosts listed here: "host", "host:port", "*.domain.tld" or an address such as
-# "192.168.1.20:8080". Empty = the proxy is off.
+# The server fetches camera media and radio streams on a browser's behalf only for those marked
+# `proxy: true`, and only from the hosts listed here: "host", "host:port", "*.domain.tld" or an address
+# such as "192.168.1.20:8080". Empty = the proxy is off.
 proxy:
   allowlist: []
   # Let a host *name* on the list resolve to an address on a private network. Leave this off and list

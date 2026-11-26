@@ -4,6 +4,7 @@ import { api } from '../api';
 import { CAMERA_LAYOUTS, CameraDock, type CameraLayout } from '../cameras/CameraDock';
 import { replayFeed } from '../live/replayFeed';
 import { type FeedFactory, LiveStore, webSocketFeed } from '../live/store';
+import { useRadio } from '../radio/useRadio';
 import { navigate, setQuery, useLocation } from '../router';
 import { chooseQuality, readDeviceHints } from '../scene/quality';
 import type { SceneController, SceneFailure, SceneMode, SceneStats } from '../scene/SceneController';
@@ -125,6 +126,9 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
   const [stats, setStats] = useState<SceneStats | null>(null);
   const [, setTick] = useState(0);
   const presets = buildViewPresets(airport);
+  // Lives here rather than in the side panel, so that hiding the panel does not stop the radio.
+  const radio = useRadio(airport.audio, airport.icao);
+  const toggleRadio = radio.toggle;
 
   useSyncExternalStore(store.subscribe, store.getVersion);
 
@@ -376,6 +380,8 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
         void scene.setMode(scene.mode === 'schematic' ? 'photoreal' : 'schematic');
       } else if (key === 'c') {
         toggleCameras();
+      } else if (key === 'r') {
+        toggleRadio();
       } else if (key === 'escape') {
         scene.select(null);
       } else {
@@ -385,7 +391,7 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selected, notify, toggleCameras]);
+  }, [selected, notify, toggleCameras, toggleRadio]);
 
   const selectedAircraft = selected ? store.aircraft.get(selected) : undefined;
   const now = store.serverNow();
@@ -455,6 +461,17 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
             <span className="pill" data-testid="aircraft-count">
               {countAircraft(store.aircraft.values())} aircraft
             </span>
+            {radio.station && (radio.state === 'on' || radio.state === 'tuning') && (
+              <button
+                type="button"
+                className="pill pill-radio"
+                data-testid="radio-pill"
+                title="Stop the radio (R)"
+                onClick={radio.stop}
+              >
+                <span className="radio-lamp" /> {radio.station.name}
+              </button>
+            )}
             {showFps && stats && (
               <span className="pill" data-testid="fps">
                 {stats.fps.toFixed(0)} fps · {stats.frameMs.toFixed(1)} ms · {stats.quality}
@@ -509,6 +526,7 @@ function AirportScene(props: { airport: AirportDetail; airports: AirportSummary[
             selected={selected}
             onSelect={(hex) => select(hex)}
             onClose={() => setPanelOpen(false)}
+            radio={radio}
           />
         )}
       </div>

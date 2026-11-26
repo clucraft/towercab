@@ -823,3 +823,24 @@ and are dropped after 30 s, because one lost there is usually leaving the ground
 
 The 10 s of dead reckoning follow a straight line, so an aircraft lost in a turn can stop up to that far past it, off
 the taxiway, until the next report slides it back.
+
+### D-086 A radio for stations you configure; LiveATC only linked (Addition)
+
+Asked for on 2026-11-25: live ATC audio for each airport, with a small radio showing the station, play and pause.
+The build prompt said to link to LiveATC and not embed or re-stream its audio, and LiveATC's terms of use, read the
+same day, agree: personal and non-commercial use; consult LiveATC before linking directly to a stream, then credit it
+with a prominent link (3.15); do not make the service available over another network (3.3); and on every page,
+streams may not be used in third-party products. So TowerCab plays no LiveATC stream of its own accord.
+
+The radio plays stations configured per airport (`audio:` in the airport's entry), usually a receiver of your own:
+RTLSDR-Airband sending MP3 to Icecast, checked against its wiki, not with hardware. A station marked `proxy: true` is
+fetched by the server through the camera proxy, with the same allowlist and the same rules, so a receiver on a home
+network can be heard from outside it and a plain http stream can play on an https site; at most 24 listeners at once,
+audio only. A station on liveatc.net may not be proxied, and gets the credit and link LiveATC asks for, for whoever
+has their permission. Without a station the radio says so and links to LiveATC's page for the airport.
+
+Stopping drops the connection instead of pausing, so nothing is fetched while it is off and it starts again at the
+live edge. The signal meter measures the sound only for proxied stations: Web Audio on a stream from another site
+without CORS headers would make it silent, so such a station plays straight through the audio element and the meter
+shows a steady line. The radio lives with the page, not the side panel, so closing the panel does not stop it; a pill
+over the scene shows it is on and stops it, and so does `R`.

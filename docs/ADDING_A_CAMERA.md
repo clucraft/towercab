@@ -212,5 +212,5 @@ search fails or finds less than it should, the server log has the provider's ans
 
 ## ATC audio
 
-TowerCab links to the airport's page on LiveATC in the side panel. It does not embed or re-stream LiveATC's
-audio.
+The radio in the side panel plays stations you configure, such as a receiver of your own; it links to the
+airport's page on LiveATC and does not play or re-stream LiveATC's audio. [RADIO.md](RADIO.md) has the details.

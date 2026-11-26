@@ -7,6 +7,7 @@ import {
   type AirportTower,
   fieldElevationEllipsoidM,
   type LayoutCollection,
+  publicAudioStations,
   type Runway,
 } from '@towercab/shared';
 import { geoidUndulationM } from './geoid';
@@ -77,6 +78,7 @@ export function buildAirportInfo(
     tower,
     runways,
     links: { ...defaultLinks(entry.icao, record?.country), ...entry.links },
+    audio: publicAudioStations(entry.icao, entry.audio),
     sources: {
       airport: record ? 'ourairports' : 'config',
       layout: layout && layout.features.length > 0 ? 'osm' : null,

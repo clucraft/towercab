@@ -80,6 +80,7 @@ export const AIRPORT = {
     diagram: 'https://www.faa.gov/airports/runway_safety/diagrams/',
     flightaware: 'https://www.flightaware.com/live/airport/KLAF',
   },
+  audio: [] as { name: string; frequency?: string; src: string; proxied: boolean; attribution?: string }[],
   sources: { airport: 'ourairports', layout: null, layoutFetchedAt: null },
   layout: null,
 };
@@ -193,6 +194,8 @@ export async function mockBackend(
   page: Page,
   options: {
     features?: Partial<(typeof CLIENT_CONFIG)['features']>;
+    /** Changes to what the server says about KLAF. */
+    airport?: Partial<typeof AIRPORT>;
     /** What each one-second update carries. The default moves the three aircraft along. */
     delta?: (at: number, step: number) => { upserts: unknown[]; removed: string[] };
   } = {},
@@ -219,7 +222,9 @@ export async function mockBackend(
       ],
     }),
   );
-  await page.route('**/api/airports/KLAF', (route) => route.fulfill({ json: AIRPORT }));
+  await page.route('**/api/airports/KLAF', (route) =>
+    route.fulfill({ json: { ...AIRPORT, ...options.airport } }),
+  );
   // A real observation from KLAF (2026-11-24 20:54Z), as the server decodes it.
   await page.route('**/api/metar/KLAF', (route) =>
     route.fulfill({

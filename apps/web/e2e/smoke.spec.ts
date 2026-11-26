@@ -42,7 +42,7 @@ test('vehicles are listed on their own, and a link that does not apply is left o
   await expect(page.getByTestId('selection-panel')).toContainText('Vehicle');
 
   const panel = page.getByTestId('side-panel');
-  await expect(panel.getByRole('link', { name: /LiveATC/ })).toBeVisible();
+  await expect(panel.getByRole('link', { name: 'LiveATC: listen to KLAF' })).toBeVisible();
   await expect(panel.getByRole('link', { name: /diagram/ })).toHaveCount(0);
 });
 
@@ -220,7 +220,10 @@ test('the side panel lists the traffic, the weather hint and the sources', async
   await expect(panel.getByRole('button', { name: /N2884L/ })).toBeVisible();
   // Wind from 050 degrees: runway 05 faces straight into it.
   await expect(panel.getByTestId('runway-hint')).toContainText('runway 05');
-  await expect(panel.getByRole('link', { name: /LiveATC/ })).toHaveAttribute('target', '_blank');
+  await expect(panel.getByRole('link', { name: 'LiveATC: listen to KLAF' })).toHaveAttribute(
+    'target',
+    '_blank',
+  );
   await expect(page.getByTestId('credits')).toContainText('CesiumJS');
 
   // Picking a row selects that aircraft in the scene.

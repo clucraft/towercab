@@ -15,6 +15,7 @@ Live aircraft around an airport in a 3D scene, like the view from the tower cab,
 - A side panel with the traffic by phase of flight, the METAR, and how healthy each data source is.
 - Details of the aircraft you select, with a photo of it, or a picture of its type when nobody has taken one.
 - Live cameras you add yourself, beside the scene or laid over it with the aircraft labels on top.
+- A radio in the side panel for the tower frequency from an airband receiver of your own.
 - One container. The server fetches the traffic once per airport and shares it with every browser; when
   nobody is watching, it stops asking.
 
@@ -75,10 +76,11 @@ Edits are picked up while the server runs, and an edit that does not validate is
 | Section     | What it holds                                                                                               |
 | ----------- | ----------------------------------------------------------------------------------------------------------- |
 | `airports`  | The airports, with how far out and how high to show traffic. [Adding an airport](docs/ADDING_AN_AIRPORT.md) |
+|             | Each with its radio stations, if any. [The radio](docs/RADIO.md)                                            |
 | `providers` | Which traffic sources to use and in what order. [Data sources](#data-sources)                               |
 | `polling`   | How often to ask while someone is watching, and when to stop                                                |
 | `cameras`   | Your cameras. Empty at first. [Adding a camera](docs/ADDING_A_CAMERA.md)                                    |
-| `proxy`     | The hosts the server may fetch camera video from                                                            |
+| `proxy`     | The hosts the server may fetch camera video and radio streams from                                          |
 | `go2rtc`    | Address of a go2rtc instance, for your own RTSP camera                                                      |
 | `discovery` | Camera search on the admin page                                                                             |
 | `client`    | How far behind real time browsers draw (2.5 s by default)                                                   |
@@ -153,6 +155,7 @@ tested against the server directly.
 | `4`      | Orbit the field                                |
 | `5`, `F` | Follow the selected aircraft                   |
 | `C`      | Open or close the cameras                      |
+| `R`      | Play or stop the radio                         |
 | `S`      | Switch between Photoreal and Schematic         |
 | `Esc`    | Clear the selection                            |
 
@@ -204,6 +207,14 @@ picture. The `/admin` page (set `ADMIN_TOKEN`) places cameras in the scene with 
 YouTube and Windy for cameras near an airport; nothing it finds is shown until you approve it.
 
 [docs/ADDING_A_CAMERA.md](docs/ADDING_A_CAMERA.md) has the details.
+
+### The radio
+
+The side panel has a small radio: station and frequency on a display, on-air light, signal meter, play and pause,
+station buttons and volume. It plays streams you configure per airport, usually a receiver of your own (an RTL-SDR
+stick with RTLSDR-Airband and Icecast), which the server can pass on so it is heard from outside your network.
+TowerCab ships with no stations and does not play LiveATC's streams, whose terms ask for their permission first; it
+links to LiveATC's page for the airport instead. [docs/RADIO.md](docs/RADIO.md) has the details.
 
 ### Replay
 

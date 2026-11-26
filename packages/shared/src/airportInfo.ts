@@ -1,4 +1,5 @@
 import type { AirportLinks, Tower } from './airport';
+import type { PublicAudioStation } from './audio';
 import { angleDiffDeg } from './geo';
 
 export interface RunwayEnd {
@@ -55,6 +56,8 @@ export interface AirportInfo extends AirportSummary {
   runways: Runway[];
   /** There is no diagram where none is known. */
   links: Required<Omit<AirportLinks, 'diagram'>> & Pick<AirportLinks, 'diagram'>;
+  /** Stations for the radio. Empty when none are configured. */
+  audio: PublicAudioStation[];
   /** Where the reference data came from, for the attribution footer. */
   sources: {
     airport: 'ourairports' | 'config';

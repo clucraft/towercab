@@ -156,6 +156,7 @@ describe('view presets', () => {
     tower,
     runways,
     links: { liveatc: 'https://x.test/', diagram: 'https://x.test/', flightaware: 'https://x.test/' },
+    audio: [],
     sources: { airport: 'ourairports', layout: null, layoutFetchedAt: null },
   });
 
