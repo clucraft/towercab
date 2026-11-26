@@ -5,7 +5,7 @@ import { type Observation, ProviderError } from '../src/providers/types';
 import { Backoff } from '../src/scheduler/backoff';
 import { AirportPoller, type PollTarget } from '../src/scheduler/poller';
 import { TokenBucket } from '../src/scheduler/tokenBucket';
-import { FakeSource, minGap, obs } from './helpers';
+import { FakeSource, maxGap, minGap, obs } from './helpers';
 
 describe('TokenBucket', () => {
   it('starts full, then allows one request per interval', () => {
@@ -484,6 +484,58 @@ describe('AirportPoller', () => {
     // Two airports share the budget: each still gets a poll about every 2.2 s.
     expect(times.length).toBeGreaterThan(95);
     expect(times.length).toBeLessThanOrEqual(110);
+  });
+
+  // Airports that poll within a few hundred milliseconds of each other used to collide on every cycle: the
+  // first took adsb.fi's token and the second gave up on it, every time, and lived on adsb.lol's few requests.
+  describe.each([
+    ['at the same moment', [0, 0]],
+    ['150 ms apart', [0, 150]],
+    ['250 ms apart', [250, 0]],
+    ['1 s apart', [0, 1000]],
+  ])('two airports asking %s', (_name, offsets) => {
+    it('take turns at adsb.fi, each getting it about every 2.2 s', async () => {
+      const fi = provider('adsbfi', 1);
+      const providers = () => [fi.managed];
+      const pollers = offsets.map(
+        (offset, i) =>
+          new AirportPoller(
+            { ...target(), area: () => ({ lat: 40 + i, lon: -86, radiusNm: 6 }) },
+            { providers, polling: () => polling, offsetMs: () => offset },
+          ),
+      );
+      for (const p of pollers) p.setViewers(1);
+      await vi.advanceTimersByTimeAsync(120_000);
+      for (const p of pollers) p.stop();
+
+      expect(minGap(fi.source.calls.map((c) => c.at).sort((a, b) => a - b))).toBeGreaterThanOrEqual(1100);
+      for (const lat of [40, 41]) {
+        const times = fi.source.calls.filter((c) => c.lat === lat).map((c) => c.at);
+        expect(times.length).toBeGreaterThanOrEqual(50);
+        expect(maxGap(times)).toBeLessThanOrEqual(2300);
+      }
+    });
+  });
+
+  it('shares adsb.fi evenly between three airports, about every 3.3 s each', async () => {
+    const fi = provider('adsbfi', 1);
+    const providers = () => [fi.managed];
+    const pollers = [0, 0, 100].map(
+      (offset, i) =>
+        new AirportPoller(
+          { ...target(), area: () => ({ lat: 40 + i, lon: -86, radiusNm: 6 }) },
+          { providers, polling: () => polling, offsetMs: () => offset },
+        ),
+    );
+    for (const p of pollers) p.setViewers(1);
+    await vi.advanceTimersByTimeAsync(120_000);
+    for (const p of pollers) p.stop();
+
+    for (const lat of [40, 41, 42]) {
+      const times = fi.source.calls.filter((c) => c.lat === lat).map((c) => c.at);
+      expect(times.length).toBeGreaterThanOrEqual(33);
+      expect(maxGap(times)).toBeLessThanOrEqual(4500);
+    }
   });
 
   it('skips a cycle rather than queueing when no source has a token', async () => {

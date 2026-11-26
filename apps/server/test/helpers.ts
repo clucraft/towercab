@@ -196,3 +196,12 @@ export function minGap(times: number[]): number {
   }
   return min;
 }
+
+/** The longest gap between consecutive times, which must be in order. */
+export function maxGap(times: number[]): number {
+  let max = 0;
+  for (let i = 1; i < times.length; i += 1) {
+    max = Math.max(max, (times[i] as number) - (times[i - 1] as number));
+  }
+  return max;
+}

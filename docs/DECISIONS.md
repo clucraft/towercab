@@ -106,8 +106,8 @@ The prompt does not say whether sources are queried together or one at a time. C
 every cycle without leaning on free community services harder than needed:
 
 - the local receiver, every cycle;
-- the first public source by priority that has a token: this cycle's primary. A poll that is up to 40% of
-  the interval early waits for its token instead of being skipped;
+- the first public source by priority that has a token: this cycle's primary. A poll may wait up to three
+  quarters of the interval for its token instead of being skipped (D-084);
 - every `polling.secondaryEveryN`-th cycle (default 3), the other public sources too, to fill coverage gaps;
 - OpenSky only when no other enabled source is usable.
 
@@ -792,3 +792,19 @@ Cesium has `Resource.retryCallback` for this, but it cannot be reached through `
 tiles exist before there is a resource to set it on. So the failed tiles are marked as not loaded, which is not public;
 a test fails when an upgrade changes it. Tried in a browser with Google's answers replaced by 429: from the start for ten
 seconds, for good, while turning, and one tile in thirty.
+
+### D-084 Open airports take turns at adsb.fi (Fix)
+
+Aircraft faded out and came back at O'Hare on 2026-11-25 while Dayton was open as well. All airports share adsb.fi's one
+request per 1.1 s, and a poll waited at most 0.8 s for it. When two airports polled within about 0.3 s of each other,
+the first took the request every time and the second never got one: it lived on adsb.lol, which its daily quota spaces
+about 30 s apart. Positions 30 s apart are more than the browser's 10 s of dead reckoning, and more than the server's
+30 s before a moving aircraft is dropped. Over four minutes at O'Hare every position came from adsb.lol; aircraft
+would have faded out 81 times and were dropped 72 times, most of them back seconds later. Which airport lost out
+depended on when each was opened, so it happened only some of the time.
+
+Now a poll may wait up to three quarters of the interval (1.5 s) for its token, and the next cycle counts from when
+the request went out. An airport that had to wait then stays clear of the other one: two airports get adsb.fi about
+every 2.2 s each, three about every 3.3 s. Tests run two airports polling at the same moment and 150 ms, 250 ms and
+1 s apart, and three at once. The Cloudflare proxy in front of the public address was not involved: the same four
+minutes through it and directly brought the same messages.

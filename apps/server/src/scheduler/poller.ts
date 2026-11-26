@@ -91,16 +91,20 @@ export class AirportPoller {
     this.pause();
   }
 
-  /** One polling cycle. Public so tests and the soak script can drive it directly. */
-  async pollOnce(): Promise<void> {
+  /**
+   * One polling cycle. Public so tests and the soak script can drive it directly. Resolves to the moment the
+   * requests went out (after any wait for a token), or undefined when there was nothing to poll.
+   */
+  async pollOnce(): Promise<number | undefined> {
     const area = this.target.area();
-    if (!area) return;
+    if (!area) return undefined;
     this.cycle += 1;
     const config = this.deps.polling();
     const active = this.currentState === 'active';
     const interval = active ? config.activeIntervalMs : config.idleIntervalMs;
-    // A poll that is a little early may wait for its token instead of being skipped.
-    const maxWaitMs = active ? Math.floor(config.activeIntervalMs * 0.4) : 0;
+    // Airports share each source's requests. Waiting up to most of a cycle for the next token lets two
+    // airports that ask at the same moment take turns; with a shorter wait the second one lost it every time.
+    const maxWaitMs = active ? Math.floor(config.activeIntervalMs * 0.75) : 0;
 
     const providers = this.deps
       .providers()
@@ -146,21 +150,24 @@ export class AirportPoller {
       }
     }
 
+    const sentAt = this.now();
     await Promise.all(tasks);
     const now = this.now();
     this.lastPollAt = now;
     // Aircraft are dropped 30 s after they were last heard; when polling slowly that has to stretch, or
     // every aircraft would vanish between polls.
     this.target.commit(now, Math.max(30_000, Math.round(interval * 1.5) + 5000));
+    return sentAt;
   }
 
   private async tick(): Promise<void> {
     this.tickTimer = null;
     if (this.currentState === 'paused' || this.polling) return;
     const startedAt = this.now();
+    let sentAt: number | undefined;
     this.polling = true;
     try {
-      await this.pollOnce();
+      sentAt = await this.pollOnce();
     } catch (err) {
       this.deps.log?.debug({ icao: this.target.icao, err: (err as Error).message }, 'poll cycle failed');
     } finally {
@@ -171,7 +178,9 @@ export class AirportPoller {
     if (state === 'paused') return;
     const config = this.deps.polling();
     const interval = state === 'active' ? config.activeIntervalMs : config.idleIntervalMs;
-    if (!this.tickTimer) this.schedule(Math.max(0, interval - (this.now() - startedAt)));
+    // The next cycle counts from when the requests went out. After waiting for a token that moves this airport's
+    // turn away from the airport that had it, so the two stop arriving at the same moment.
+    if (!this.tickTimer) this.schedule(Math.max(0, interval - (this.now() - (sentAt ?? startedAt))));
   }
 
   private schedule(delayMs: number): void {

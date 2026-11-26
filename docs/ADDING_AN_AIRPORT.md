@@ -122,8 +122,8 @@ near one, KTEL was an hour out. If yours is, put its `timezone` in, by its
 
 ### Several airports
 
-Only airports that someone is looking at are polled. adsb.fi allows one request a second, which is two airports at
-the full rate; with three open at the same time each is updated about every three seconds.
+Only airports that someone is looking at are polled. adsb.fi allows one request a second, and the open airports
+take turns: with two open each is updated about every 2.2 s, with three about every 3.3 s.
 
 Every time an airport is opened in Photoreal counts as one "root tile" of the Cesium ion
 [allowance](../README.md#a-cesium-ion-token), switching between airports included.

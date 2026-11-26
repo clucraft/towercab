@@ -30,7 +30,9 @@ export class TokenBucket {
   waitMs(now: number): number {
     this.refill(now);
     if (this.tokens >= 1) return 0;
-    return Math.ceil((1 - this.tokens) * this.refillIntervalMs);
+    // Fractions of a token carry rounding noise: 100.0000000001 ms is 100 ms, not 101. Rounding one wait up
+    // by a millisecond would leave the next request a millisecond short of the interval after it.
+    return Math.ceil((1 - this.tokens) * this.refillIntervalMs - 1e-6);
   }
 
   /** Takes a token, reserving a future one if the bucket is empty. Returns the wait in milliseconds. */

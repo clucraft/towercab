@@ -153,7 +153,8 @@ towercab/
 - [x] The sky follows the sun over the airport, with local time, sunrise and sunset in the panel (D-078, D-079); no
       more wall of rough tiles when the view turns (D-080)
 - [x] Tried at KORD, KMDW, KFWA, KDEN, KDTW, KLAN, KDAY and WSSS (`ADDING_AN_AIRPORT.md`); vehicles are not aircraft (D-081), the FAA link
-      is left out where it does not apply (D-082), Google's limit per minute is waited out (D-083)
+      is left out where it does not apply (D-082), Google's limit per minute is waited out (D-083), open airports take
+      turns at adsb.fi (D-084)
 
 ### Not verified, for want of hardware, accounts or keys
 
