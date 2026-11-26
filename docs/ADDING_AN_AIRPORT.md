@@ -132,7 +132,8 @@ Every time an airport is opened in Photoreal counts as one "root tile" of the Ce
 
 Public ADS-B services see little on the ground: their receivers are rarely close enough to an airport to hear
 aircraft on the taxiways. If aircraft appear only once airborne, that is why, and the answer is
-[your own receiver](RECEIVER.md) near the field.
+[your own receiver](RECEIVER.md) near the field. An aircraft that is heard on the taxiways only now and then stays where
+it was last drawn for up to a minute instead of fading out.
 
 ## Removing an airport
 

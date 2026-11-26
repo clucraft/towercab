@@ -1,4 +1,4 @@
-import { EARTH_RADIUS_M, MPS_PER_KT } from '@towercab/shared';
+import { EARTH_RADIUS_M, MPS_PER_KT, TAXI_HOLD_MAX_KT } from '@towercab/shared';
 
 /**
  * Smooth motion between position reports.
@@ -9,7 +9,7 @@ import { EARTH_RADIUS_M, MPS_PER_KT } from '@towercab/shared';
  *
  * - interpolate between the two reports around the render time;
  * - when the next report is late, carry on along the last track at the last ground speed for at most 10 s,
- *   then fade out;
+ *   then fade out; an aircraft taxiing stops there instead and stays until the server drops it;
  * - when a late report shows the aircraft was somewhere else than assumed, close the gap gradually. The
  *   correction is spread out so that an aircraft is never drawn moving backwards along its path.
  */
@@ -213,8 +213,13 @@ export class MotionBuffer {
     const distance = gsKt * MPS_PER_KT * seconds;
     const north = distance * Math.cos(direction * RAD);
     const east = distance * Math.sin(direction * RAD);
+    // Receivers often lose aircraft on the taxiways for half a minute. One that was taxiing is held where it got
+    // to, solid; the server keeps it for up to a minute (TAXI_HOLD_MS) and then drops it.
+    const taxiing = last.onGround && gsKt < TAXI_HOLD_MAX_KT;
     const alpha =
-      overdueMs <= EXTRAPOLATE_MAX_MS ? 1 : Math.max(0, 1 - (overdueMs - EXTRAPOLATE_MAX_MS) / FADE_OUT_MS);
+      overdueMs <= EXTRAPOLATE_MAX_MS || taxiing
+        ? 1
+        : Math.max(0, 1 - (overdueMs - EXTRAPOLATE_MAX_MS) / FADE_OUT_MS);
     return {
       lat: last.lat + north / EARTH_RADIUS_M / RAD,
       lon: last.lon + east / (EARTH_RADIUS_M * Math.cos(last.lat * RAD)) / RAD,
@@ -224,7 +229,7 @@ export class MotionBuffer {
       extraHeightM:
         last.onGround || last.vertRateFpm == null ? 0 : (last.vertRateFpm * 0.3048 * seconds) / 60,
       headingDeg: last.headingDeg ?? last.trackDeg,
-      // Once the dead-reckoning limit is reached the aircraft is held where it is while it fades.
+      // Once the dead-reckoning limit is reached the aircraft is held where it is, fading or taxiing.
       speedMps: overdueMs <= EXTRAPOLATE_MAX_MS ? gsKt * MPS_PER_KT : 0,
       vertRateFpm: last.vertRateFpm,
       onGround: last.onGround,

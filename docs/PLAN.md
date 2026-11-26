@@ -154,7 +154,7 @@ towercab/
       more wall of rough tiles when the view turns (D-080)
 - [x] Tried at KORD, KMDW, KFWA, KDEN, KDTW, KLAN, KDAY and WSSS (`ADDING_AN_AIRPORT.md`); vehicles are not aircraft (D-081), the FAA link
       is left out where it does not apply (D-082), Google's limit per minute is waited out (D-083), open airports take
-      turns at adsb.fi (D-084)
+      turns at adsb.fi (D-084), taxiing aircraft are held, not faded (D-085)
 
 ### Not verified, for want of hardware, accounts or keys
 

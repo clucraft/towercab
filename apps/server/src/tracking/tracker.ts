@@ -7,6 +7,8 @@ import {
   isGroundVehicle,
   type Phase,
   type Runway,
+  TAXI_HOLD_MAX_KT,
+  TAXI_HOLD_MS,
   type TrailPoint,
 } from '@towercab/shared';
 import type { Observation } from '../providers/types';
@@ -160,10 +162,14 @@ export class AirportTracker {
         continue;
       }
       // A source can keep listing an aircraft for a minute after its last position. For anything that
-      // moves, a position that old is wrong, so it stops being shown; a parked aircraft stays.
+      // moves fast, a position that old is wrong, so it stops being shown; a parked aircraft stays, and one
+      // taxiing stays for a minute, because receivers often miss aircraft on the taxiways for half of one.
       const standing = track.obs.altBaro === 'ground' || track.published?.onGround === true;
-      const stationary = standing && (track.obs.gsKt ?? 0) < STATIONARY_GS_KT;
-      const expired = !stationary && now - track.obs.posTime > staleAfterMs;
+      const gsKt = track.obs.gsKt ?? 0;
+      const stationary = standing && gsKt < STATIONARY_GS_KT;
+      const maxAgeMs =
+        standing && gsKt < TAXI_HOLD_MAX_KT ? Math.max(staleAfterMs, TAXI_HOLD_MS) : staleAfterMs;
+      const expired = !stationary && now - track.obs.posTime > maxAgeMs;
       const aircraft = expired ? null : this.derive(track, ctx, now);
       if (aircraft) candidates.push({ track, aircraft });
       else if (track.published) {

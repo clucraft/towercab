@@ -31,6 +31,15 @@ export const PHASE_LABELS: Record<Phase, string> = {
   vehicle: 'Vehicle',
 };
 
+/**
+ * On the ground and slower than this, an aircraft that is not heard for a while stays where it was last drawn
+ * instead of fading out: public receivers often miss aircraft on the taxiways for half a minute at a time.
+ * Take-off and landing rolls are faster, and an aircraft lost there is usually leaving the ground or the area.
+ */
+export const TAXI_HOLD_MAX_KT = 35;
+/** How old a taxiing aircraft's position may get before it is no longer shown. Elsewhere it is 30 s. */
+export const TAXI_HOLD_MS = 60_000;
+
 export const AltitudeSourceSchema = z.enum(['geom', 'baro-qnh', 'baro-std', 'ground', 'none']);
 
 const finite = z.number().refine(Number.isFinite, 'must be finite');

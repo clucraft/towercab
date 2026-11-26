@@ -808,3 +808,18 @@ the request went out. An airport that had to wait then stays clear of the other 
 every 2.2 s each, three about every 3.3 s. Tests run two airports polling at the same moment and 150 ms, 250 ms and
 1 s apart, and three at once. The Cloudflare proxy in front of the public address was not involved: the same four
 minutes through it and directly brought the same messages.
+
+### D-085 Taxiing aircraft are held, not faded (Fix)
+
+After D-084, aircraft at O'Hare still faded out now and then: in three minutes on 2026-11-25, 19 times, and 28 moving
+aircraft were dropped for a position more than 30 s old. All of them were taxiing. Public receivers miss aircraft on
+the taxiways for 13 to 30 s at a time, and adsb.fi and adsb.lol both listed some with positions 45 to 56 s old. That is
+missing data, which TowerCab cannot make up; only a receiver near the field fills it in.
+
+What can change is how the gap looks. On the ground and slower than 35 kt, an aircraft that is not heard is now drawn
+where its 10 s of dead reckoning took it, solid, until a new position comes, and the server keeps it until its position
+is 60 s old instead of 30 s. Take-off and landing rolls and aircraft in the air are unchanged: they fade after 10 s
+and are dropped after 30 s, because one lost there is usually leaving the ground or the area.
+
+The 10 s of dead reckoning follow a straight line, so an aircraft lost in a turn can stop up to that far past it, off
+the taxiway, until the next report slides it back.

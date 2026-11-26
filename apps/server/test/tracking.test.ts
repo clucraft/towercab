@@ -371,6 +371,45 @@ describe('AirportTracker', () => {
     expect(t.commit(T0 + 45_000).upserts.map((a) => a.hex)).toEqual(['a00003']);
   });
 
+  it('keeps a taxiing aircraft for a minute after its last position while a source still lists it', () => {
+    const t = tracker();
+    const taxiing = obs({
+      hex: 'a00005',
+      altBaro: 'ground',
+      gsKt: 14,
+      lat: 40.4165,
+      lon: -86.9365,
+      posTime: T0,
+    });
+    t.ingest([taxiing], 1, T0);
+    expect(t.commit(T0).upserts.map((a) => a.hex)).toEqual(['a00005']);
+    // Receivers often miss aircraft on the taxiways for half a minute and more.
+    for (const at of [20_000, 40_000, 58_000]) {
+      t.ingest([taxiing], 1, T0 + at);
+      expect(t.commit(T0 + at).removed).toEqual([]);
+    }
+    t.ingest([taxiing], 1, T0 + 62_000);
+    expect(t.commit(T0 + 62_000).removed).toEqual(['a00005']);
+  });
+
+  it('drops an aircraft lost on its take-off roll 30 s after its last position, like one in the air', () => {
+    const t = tracker();
+    const rolling = obs({
+      hex: 'a00006',
+      altBaro: 'ground',
+      gsKt: 110,
+      lat: 40.4165,
+      lon: -86.9365,
+      posTime: T0,
+    });
+    t.ingest([rolling], 1, T0);
+    t.commit(T0);
+    t.ingest([rolling], 1, T0 + 28_000);
+    expect(t.commit(T0 + 28_000).removed).toEqual([]);
+    t.ingest([rolling], 1, T0 + 32_000);
+    expect(t.commit(T0 + 32_000).removed).toEqual(['a00006']);
+  });
+
   it('works out the heading from movement when a rolling aircraft sends neither heading nor track', () => {
     const t = tracker();
     const start = { lat: 40.4165, lon: -86.9365 };

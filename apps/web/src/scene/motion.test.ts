@@ -157,6 +157,32 @@ describe('MotionBuffer', () => {
     expect(eastOf(state as { lat: number; lon: number })).toBeCloseTo(0, 6);
   });
 
+  it('holds a taxiing aircraft, solid, where dead reckoning left it when reports stop', () => {
+    const buffer = new MotionBuffer();
+    const taxiing = { onGround: true, heightM: null };
+    buffer.push(report(0, taxiing, 15));
+    buffer.push(report(2, taxiing, 15));
+    buffer.settle();
+    const limit = 2000 + EXTRAPOLATE_MAX_MS;
+    const farthest = eastOf(buffer.sample(limit) as { lat: number; lon: number });
+    expect(farthest).toBeCloseTo(15 * KT * 12, 0);
+
+    // Public receivers often miss aircraft on the taxiways for half a minute; it stays until the server drops it.
+    const later = buffer.sample(limit + 40_000);
+    expect(later?.alpha).toBe(1);
+    expect(later?.speedMps).toBe(0);
+    expect(eastOf(later as { lat: number; lon: number })).toBeCloseTo(farthest, 3);
+  });
+
+  it('still fades out an aircraft lost on its take-off or landing roll', () => {
+    const buffer = new MotionBuffer();
+    const rolling = { onGround: true, heightM: null };
+    buffer.push(report(0, rolling, 120));
+    buffer.push(report(2, rolling, 120));
+    buffer.settle();
+    expect(buffer.sample(2000 + EXTRAPOLATE_MAX_MS + FADE_OUT_MS + 1)?.alpha).toBe(0);
+  });
+
   it('climbs and descends while dead reckoning, using the last vertical rate', () => {
     const buffer = new MotionBuffer();
     buffer.push(report(0, { vertRateFpm: 600 }));
